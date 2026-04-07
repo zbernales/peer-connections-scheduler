@@ -31,39 +31,48 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
   const hoursAssigned: Record<string, number> = {};
   tutors.forEach(t => hoursAssigned[t.id] = 0);
 
-  // 1. Loop through every day of the week
   for (const day of DAYS) {
-    
-    // 2. Loop through every hour of operation (e.g., 9 to 16 for 9am-5pm)
     for (let hour = START_HOUR; hour < END_HOUR; hour++) {
       
-      // 3. Look for a tutor who can fill this slot
-      for (const tutor of tutors) {
-        
+      // 1. Gather EVERY tutor who is legally allowed to work right now
+      const eligibleTutors = tutors.filter(tutor => {
         const canWork = isAvailable(tutor, day, hour);
         const notWorking = !isAlreadyWorking(tutor.id, day, hour, schedule);
         const underMaxHours = hoursAssigned[tutor.id] < tutor.maxHours;
+        return canWork && notWorking && underMaxHours;
+      });
 
-        // If they meet all criteria, assign them the shift!
-        if (canWork && notWorking && underMaxHours) {
-          
-          const newShift: Shift = {
-            id: crypto.randomUUID(), // Generates a unique ID
-            tutorId: tutor.id,
-            subject: tutor.subjects[0], // For now, just assign their first subject
-            day: day,
-            startTime: `${hour}:00`,
-            endTime: `${hour + 1}:00` // 1 hour shifts for simplicity
-          };
+      // 2. If no one is eligible, leave the slot empty and move to the next hour
+      if (eligibleTutors.length === 0) continue;
 
-          schedule.push(newShift);
-          hoursAssigned[tutor.id] += 1;
-          
-          // Stop looking for tutors for this exact slot, move to the next hour
-          // (Remove this break if you want multiple tutors working at the same time)
-          break; 
-        }
-      }
+      // 3. Sort the eligible tutors to prioritize those who need hours!
+      eligibleTutors.sort((a, b) => {
+        const aNeedsMin = hoursAssigned[a.id] < a.minHours;
+        const bNeedsMin = hoursAssigned[b.id] < b.minHours;
+
+        // Rule A: Someone who hasn't hit minHours beats someone who has
+        if (aNeedsMin && !bNeedsMin) return -1;
+        if (!aNeedsMin && bNeedsMin) return 1;
+
+        // Rule B: If both need minHours (or both have hit it), give the shift 
+        // to whoever has the fewest hours currently assigned to them.
+        return hoursAssigned[a.id] - hoursAssigned[b.id];
+      });
+
+      // 4. Pick the winner (the first person in our newly sorted list)
+      const winner = eligibleTutors[0];
+
+      const newShift: Shift = {
+        id: crypto.randomUUID(),
+        tutorId: winner.id,
+        subject: winner.subjects[0], // We are still just picking their first subject
+        day: day,
+        startTime: `${hour}:00`,
+        endTime: `${hour + 1}:00`
+      };
+
+      schedule.push(newShift);
+      hoursAssigned[winner.id] += 1;
     }
   }
 

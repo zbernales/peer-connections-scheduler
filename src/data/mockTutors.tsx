@@ -8,7 +8,7 @@ export const mockTutors: Tutor[] = [
     minHours: 5,
     maxHours: 10,
     availability: [
-      { day: 'Monday', startTime: '10:00', endTime: '14:00' },
+      { day: 'Monday', startTime: '10:00', endTime: '14:30' },
       { day: 'Wednesday', startTime: '10:00', endTime: '14:00' }
     ]
   },
@@ -19,7 +19,7 @@ export const mockTutors: Tutor[] = [
     minHours: 2,
     maxHours: 6,
     availability: [
-      { day: 'Tuesday', startTime: '09:00', endTime: '15:00' },
+      { day: 'Tuesday', startTime: '09:30', endTime: '15:00' },
       { day: 'Thursday', startTime: '09:00', endTime: '15:00' }
     ]
   },
@@ -30,9 +30,9 @@ export const mockTutors: Tutor[] = [
     minHours: 4,
     maxHours: 8,
     availability: [
-      { day: 'Monday', startTime: '09:00', endTime: '12:00' },
+      { day: 'Monday', startTime: '09:00', endTime: '12:30' },
       { day: 'Wednesday', startTime: '09:00', endTime: '12:00' },
-      { day: 'Friday', startTime: '09:00', endTime: '12:00' }
+      { day: 'Friday', startTime: '09:00', endTime: '12:30' }
     ]
   },
   {
@@ -42,7 +42,7 @@ export const mockTutors: Tutor[] = [
     minHours: 10,
     maxHours: 20, // Needs a lot of hours
     availability: [
-      { day: 'Monday', startTime: '13:00', endTime: '17:00' },
+      { day: 'Monday', startTime: '13:30', endTime: '17:00' },
       { day: 'Tuesday', startTime: '13:00', endTime: '17:00' },
       { day: 'Wednesday', startTime: '13:00', endTime: '17:00' },
       { day: 'Thursday', startTime: '13:00', endTime: '17:00' },

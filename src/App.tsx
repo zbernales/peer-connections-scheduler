@@ -1,5 +1,5 @@
 import { mockTutors } from './data/mockTutors';
-import { generateSchedule } from './utils/scheduler';
+import { generateSchedule, timeToFloat } from './utils/scheduler';
 import type { DayOfWeek } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -36,7 +36,7 @@ function App() {
               ) : (
                 // Sort shifts by start time so they appear in chronological order
                 daysShifts
-                  .sort((a, b) => parseInt(a.startTime) - parseInt(b.startTime))
+                  .sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime))
                   .map(shift => {
                     const tutorName = mockTutors.find(t => t.id === shift.tutorId)?.name || 'Unknown';
                     return (
@@ -66,14 +66,17 @@ function App() {
           // Sort them by day, then by time
           tutorShifts.sort((a, b) => {
             if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
-            return parseInt(a.startTime) - parseInt(b.startTime);
+            return timeToFloat(a.startTime) - timeToFloat(b.startTime);
           });
+
+         // Multiply the number of shifts by 0.5 to get true hours
+          const totalHours = tutorShifts.length * 0.5;
 
           return (
             <div key={tutor.id} style={{ border: '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: '#fff' }}>
               <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
-              <p style={{ margin: '0 0 1rem 0', color: tutorShifts.length < tutor.minHours ? '#ef4444' : '#10b981' }}>
-                <strong>Scheduled: {tutorShifts.length} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
+              <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours ? '#ef4444' : '#10b981' }}>
+                <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
               </p>
               
               {tutorShifts.length === 0 ? (
@@ -103,7 +106,7 @@ function App() {
           
           subjectShifts.sort((a, b) => {
             if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
-            return parseInt(a.startTime) - parseInt(b.startTime);
+            return timeToFloat(a.startTime) - timeToFloat(b.startTime);
           });
 
           return (

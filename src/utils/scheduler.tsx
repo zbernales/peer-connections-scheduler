@@ -1,97 +1,93 @@
 import type { Tutor, Shift, DayOfWeek } from '../types';
 
-// The operating hours for Peer Connections
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const START_HOUR = 9; // 9 AM
-const END_HOUR = 17;  // 5 PM
+const START_HOUR = 9;  // 9.0 = 9:00 AM
+const END_HOUR = 17;   // 17.0 = 5:00 PM
+const IDEAL_TUTORS_PER_HOUR = 3; 
 
-// Checks if a tutor's availability includes a specific day and hour
-function isAvailable(tutor: Tutor, day: DayOfWeek, hour: number): boolean {
+// --- NEW TIME HELPERS ---
+// Converts "09:30" to 9.5
+export function timeToFloat(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours + (minutes / 60);
+}
+
+// Converts 9.5 to "09:30"
+export function floatToTime(timeFloat: number): string {
+  const hours = Math.floor(timeFloat);
+  const minutes = (timeFloat - hours) * 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : minutes}`;
+}
+
+// --- UPDATED CONSTRAINT HELPERS ---
+function isAvailable(tutor: Tutor, day: DayOfWeek, timeSlot: number): boolean {
   return tutor.availability.some(slot => {
     if (slot.day !== day) return false;
-    
-    // Convert "09:00" to the number 9 for easy comparison
-    const start = parseInt(slot.startTime.split(':')[0], 10);
-    const end = parseInt(slot.endTime.split(':')[0], 10);
-    
-    return hour >= start && hour < end;
+    const start = timeToFloat(slot.startTime);
+    const end = timeToFloat(slot.endTime);
+    // They must be available for the full 30-minute block
+    return timeSlot >= start && (timeSlot + 0.5) <= end;
   });
 }
 
-// Checks if a tutor is already scheduled at this exact time
-function isAlreadyWorking(tutorId: string, day: DayOfWeek, hour: number, currentSchedule: Shift[]): boolean {
+function isAlreadyWorking(tutorId: string, day: DayOfWeek, timeSlot: number, currentSchedule: Shift[]): boolean {
   return currentSchedule.some(shift => {
-    const shiftStart = parseInt(shift.startTime.split(':')[0], 10);
-    return shift.tutorId === tutorId && shift.day === day && shiftStart === hour;
+    return shift.tutorId === tutorId && 
+           shift.day === day && 
+           timeToFloat(shift.startTime) === timeSlot;
   });
 }
 
-// Add this constant near the top of your scheduler.ts file
-const IDEAL_TUTORS_PER_HOUR = 3; // Adjust this dial based on your budget/demand!
-
+// --- THE SCHEDULER ---
 export function generateSchedule(tutors: Tutor[]): Shift[] {
   const schedule: Shift[] = [];
   const hoursAssigned: Record<string, number> = {};
   tutors.forEach(t => hoursAssigned[t.id] = 0);
 
   for (const day of DAYS) {
-    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+    for (let timeSlot = START_HOUR; timeSlot < END_HOUR; timeSlot += 0.5) {
       
-      // 1. Gather everyone legally allowed to work this hour
       let eligibleTutors = tutors.filter(tutor => {
-        const canWork = isAvailable(tutor, day, hour);
-        const notWorking = !isAlreadyWorking(tutor.id, day, hour, schedule);
+        const canWork = isAvailable(tutor, day, timeSlot);
+        const notWorking = !isAlreadyWorking(tutor.id, day, timeSlot, schedule);
         const underMaxHours = hoursAssigned[tutor.id] < tutor.maxHours;
         return canWork && notWorking && underMaxHours;
       });
 
-      // 2. Track what subjects are currently being covered THIS hour
-      const coveredSubjectsThisHour = new Set<string>();
-      let tutorsScheduledThisHour = 0;
+      const coveredSubjectsThisSlot = new Set<string>();
+      let tutorsScheduledThisSlot = 0;
 
-      // 3. Keep assigning shifts until we hit our ideal limit OR run out of people
-      while (eligibleTutors.length > 0 && tutorsScheduledThisHour < IDEAL_TUTORS_PER_HOUR) {
-        
-        // --- THE MAGIC SORT ---
+      while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < IDEAL_TUTORS_PER_HOUR) {
         eligibleTutors.sort((a, b) => {
-          // Calculate how many *currently uncovered* subjects each tutor brings
-          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisHour.has(sub)).length;
-          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisHour.has(sub)).length;
+          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
+          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
 
-          // Rule 1: Whoever brings the most new subjects to the floor wins
-          if (aNewSubjects !== bNewSubjects) {
-            return bNewSubjects - aNewSubjects; // Sort descending
-          }
+          if (aNewSubjects !== bNewSubjects) return bNewSubjects - aNewSubjects;
 
-          // Rule 2: If they bring the same amount of new subjects, who needs minHours?
           const aNeedsMin = hoursAssigned[a.id] < a.minHours;
           const bNeedsMin = hoursAssigned[b.id] < b.minHours;
           if (aNeedsMin && !bNeedsMin) return -1;
           if (!aNeedsMin && bNeedsMin) return 1;
 
-          // Rule 3: Tie-breaker - who has worked the least overall this week?
           return hoursAssigned[a.id] - hoursAssigned[b.id];
         });
 
-        // 4. Pick the winner!
         const winner = eligibleTutors[0];
 
         const newShift: Shift = {
           id: crypto.randomUUID(),
           tutorId: winner.id,
-          subjects: winner.subjects, 
+          subjects: winner.subjects,
           day: day,
-          startTime: `${hour}:00`,
-          endTime: `${hour + 1}:00`
+          startTime: floatToTime(timeSlot),
+          endTime: floatToTime(timeSlot + 0.5) 
         };
 
-        // 5. Bookkeeping: Update all our trackers
         schedule.push(newShift);
-        hoursAssigned[winner.id] += 1;
-        winner.subjects.forEach(sub => coveredSubjectsThisHour.add(sub));
-        tutorsScheduledThisHour++;
+        hoursAssigned[winner.id] += 0.5;
+        winner.subjects.forEach(sub => coveredSubjectsThisSlot.add(sub));
+        tutorsScheduledThisSlot++;
 
-        // 6. Remove the winner from the eligible pool so they don't get scheduled twice in the same hour
         eligibleTutors = eligibleTutors.filter(t => t.id !== winner.id);
       }
     }

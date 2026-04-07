@@ -50,7 +50,7 @@ function App() {
                       <br />
                       👨‍🏫 Tutor: {tutorName}
                       <br />
-                      📚 Subject: {shift.subject}
+                      📚 Subjects: {shift.subjects.join(', ')}
                     </div>
                   );
                 })

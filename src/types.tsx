@@ -18,7 +18,7 @@ export interface Tutor {
 export interface Shift {
   id: string;
   tutorId: string;
-  subject: string;
+  subjects: string[];
   day: DayOfWeek;
   startTime: string;
   endTime: string;

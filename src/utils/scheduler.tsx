@@ -26,6 +26,9 @@ function isAlreadyWorking(tutorId: string, day: DayOfWeek, hour: number, current
   });
 }
 
+// Add this constant near the top of your scheduler.ts file
+const IDEAL_TUTORS_PER_HOUR = 3; // Adjust this dial based on your budget/demand!
+
 export function generateSchedule(tutors: Tutor[]): Shift[] {
   const schedule: Shift[] = [];
   const hoursAssigned: Record<string, number> = {};
@@ -34,45 +37,63 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
   for (const day of DAYS) {
     for (let hour = START_HOUR; hour < END_HOUR; hour++) {
       
-      // 1. Gather EVERY tutor who is legally allowed to work right now
-      const eligibleTutors = tutors.filter(tutor => {
+      // 1. Gather everyone legally allowed to work this hour
+      let eligibleTutors = tutors.filter(tutor => {
         const canWork = isAvailable(tutor, day, hour);
         const notWorking = !isAlreadyWorking(tutor.id, day, hour, schedule);
         const underMaxHours = hoursAssigned[tutor.id] < tutor.maxHours;
         return canWork && notWorking && underMaxHours;
       });
 
-      // 2. If no one is eligible, leave the slot empty and move to the next hour
-      if (eligibleTutors.length === 0) continue;
+      // 2. Track what subjects are currently being covered THIS hour
+      const coveredSubjectsThisHour = new Set<string>();
+      let tutorsScheduledThisHour = 0;
 
-      // 3. Sort the eligible tutors to prioritize those who need hours!
-      eligibleTutors.sort((a, b) => {
-        const aNeedsMin = hoursAssigned[a.id] < a.minHours;
-        const bNeedsMin = hoursAssigned[b.id] < b.minHours;
+      // 3. Keep assigning shifts until we hit our ideal limit OR run out of people
+      while (eligibleTutors.length > 0 && tutorsScheduledThisHour < IDEAL_TUTORS_PER_HOUR) {
+        
+        // --- THE MAGIC SORT ---
+        eligibleTutors.sort((a, b) => {
+          // Calculate how many *currently uncovered* subjects each tutor brings
+          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisHour.has(sub)).length;
+          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisHour.has(sub)).length;
 
-        // Rule A: Someone who hasn't hit minHours beats someone who has
-        if (aNeedsMin && !bNeedsMin) return -1;
-        if (!aNeedsMin && bNeedsMin) return 1;
+          // Rule 1: Whoever brings the most new subjects to the floor wins
+          if (aNewSubjects !== bNewSubjects) {
+            return bNewSubjects - aNewSubjects; // Sort descending
+          }
 
-        // Rule B: If both need minHours (or both have hit it), give the shift 
-        // to whoever has the fewest hours currently assigned to them.
-        return hoursAssigned[a.id] - hoursAssigned[b.id];
-      });
+          // Rule 2: If they bring the same amount of new subjects, who needs minHours?
+          const aNeedsMin = hoursAssigned[a.id] < a.minHours;
+          const bNeedsMin = hoursAssigned[b.id] < b.minHours;
+          if (aNeedsMin && !bNeedsMin) return -1;
+          if (!aNeedsMin && bNeedsMin) return 1;
 
-      // 4. Pick the winner (the first person in our newly sorted list)
-      const winner = eligibleTutors[0];
+          // Rule 3: Tie-breaker - who has worked the least overall this week?
+          return hoursAssigned[a.id] - hoursAssigned[b.id];
+        });
 
-      const newShift: Shift = {
-        id: crypto.randomUUID(),
-        tutorId: winner.id,
-        subject: winner.subjects[0], // We are still just picking their first subject
-        day: day,
-        startTime: `${hour}:00`,
-        endTime: `${hour + 1}:00`
-      };
+        // 4. Pick the winner!
+        const winner = eligibleTutors[0];
 
-      schedule.push(newShift);
-      hoursAssigned[winner.id] += 1;
+        const newShift: Shift = {
+          id: crypto.randomUUID(),
+          tutorId: winner.id,
+          subjects: winner.subjects, 
+          day: day,
+          startTime: `${hour}:00`,
+          endTime: `${hour + 1}:00`
+        };
+
+        // 5. Bookkeeping: Update all our trackers
+        schedule.push(newShift);
+        hoursAssigned[winner.id] += 1;
+        winner.subjects.forEach(sub => coveredSubjectsThisHour.add(sub));
+        tutorsScheduledThisHour++;
+
+        // 6. Remove the winner from the eligible pool so they don't get scheduled twice in the same hour
+        eligibleTutors = eligibleTutors.filter(t => t.id !== winner.id);
+      }
     }
   }
 

@@ -1,121 +1,67 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { mockTutors } from './data/mockTutors';
+import { generateSchedule } from './utils/scheduler';
+import type { DayOfWeek } from './types';
+
+const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 function App() {
-  const [count, setCount] = useState(0)
+  const schedule = generateSchedule(mockTutors);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+      <h1>Peer Connections Scheduler</h1>
+      
+      {/* --- Existing Roster Section --- */}
+      <h2>Current Roster</h2>
+      <ul style={{ marginBottom: '2rem' }}>
+        {mockTutors.map(tutor => (
+          <li key={tutor.id}>
+            <strong>{tutor.name}</strong> - Subjects: {tutor.subjects.join(', ')} 
+            <br />
+            Hours: {tutor.minHours} to {tutor.maxHours}
+          </li>
+        ))}
+      </ul>
 
-      <div className="ticks"></div>
+      <hr />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* --- New Schedule Output Section --- */}
+      <h2>Generated Schedule</h2>
+      
+      <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+        {DAYS.map(day => {
+          // Filter the total schedule to just get this day's shifts
+          const daysShifts = schedule.filter(s => s.day === day);
+          
+          return (
+            <div key={day} style={{ border: '1px solid #ccc', padding: '1rem', minWidth: '200px', borderRadius: '8px' }}>
+              <h3 style={{ marginTop: 0 }}>{day}</h3>
+              
+              {daysShifts.length === 0 ? (
+                <p style={{ color: 'gray', fontStyle: 'italic' }}>No shifts scheduled.</p>
+              ) : (
+                daysShifts.map(shift => {
+                  // Find the tutor's name to display instead of just their ID
+                  const tutorName = mockTutors.find(t => t.id === shift.tutorId)?.name || 'Unknown';
+                  
+                  return (
+                    <div key={shift.id} style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f0f4f8', borderRadius: '4px' }}>
+                      <strong>{shift.startTime} - {shift.endTime}</strong>
+                      <br />
+                      👨‍🏫 Tutor: {tutorName}
+                      <br />
+                      📚 Subject: {shift.subject}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;

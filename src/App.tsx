@@ -70,7 +70,7 @@ function App() {
             
             {/* --- ROUTE 1: THE STUDENT FORM (/submit) --- */}
             <Route path="/submit" element={
-              <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                 <TutorForm onSubmit={(newTutor) => {
                   alert(`Success! ${newTutor.name}'s availability has been submitted to the database.`);
                 }} />

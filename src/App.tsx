@@ -5,7 +5,7 @@ import { TutorForm } from './components/TutorForm';
 import { useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Tutor, DayOfWeek, Shift } from './types';
+import type { Tutor, DayOfWeek } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 

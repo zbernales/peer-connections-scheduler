@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { mockTutors } from './data/mockTutors';
 import { generateSchedule, timeToFloat } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
 import { useEffect } from 'react';

@@ -9,28 +9,27 @@ import type { Tutor, DayOfWeek, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// Helper to visually merge contiguous 30-minute shifts
-function mergeShiftsForUI(shifts: Shift[]) {
+function mergeShiftsForUI(shifts: any[]) {
   if (shifts.length === 0) return [];
 
   const merged = [];
-  // Start the first block
   let currentBlock = { ...shifts[0] };
 
   for (let i = 1; i < shifts.length; i++) {
     const nextShift = shifts[i];
 
-    // If the next shift is on the same day AND starts exactly when the current one ends...
-    if (nextShift.day === currentBlock.day && nextShift.startTime === currentBlock.endTime) {
-      // Extend the current block's end time
+    // Merge ONLY if it's the same day, touches end-to-start, AND is the exact same tutor
+    if (
+      nextShift.day === currentBlock.day && 
+      nextShift.startTime === currentBlock.endTime &&
+      nextShift.tutorId === currentBlock.tutorId 
+    ) {
       currentBlock.endTime = nextShift.endTime;
     } else {
-      // Otherwise, save the completed block and start a new one
       merged.push(currentBlock);
       currentBlock = { ...nextShift };
     }
   }
-  // Don't forget to push the very last block!
   merged.push(currentBlock);
 
   return merged;
@@ -198,11 +197,12 @@ function App() {
                           <p style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ No coverage this week!</p>
                         ) : (
                           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
-                            {subjectShifts.map(shift => {
-                              const tutorName = roster.find(t => t.id === shift.tutorId)?.name || 'Unknown';
+                            {/* Pass subjectShifts through the upgraded merger */}
+                            {mergeShiftsForUI(subjectShifts).map((block, index) => {
+                              const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
                               return (
-                                <li key={shift.id} style={{ marginBottom: '0.25rem' }}>
-                                  <strong>{shift.day} {shift.startTime}</strong> ({tutorName})
+                                <li key={index} style={{ marginBottom: '0.25rem' }}>
+                                  <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
                                 </li>
                               );
                             })}

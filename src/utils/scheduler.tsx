@@ -5,27 +5,28 @@ const START_HOUR = 9;  // 9.0 = 9:00 AM
 const END_HOUR = 17;   // 17.0 = 5:00 PM
 const IDEAL_TUTORS_PER_HOUR = 3; 
 
-// --- NEW TIME HELPERS ---
-// Converts "09:30" to 9.5
+// --- NEW CONFIGURATION VARIABLE ---
+export const MAX_CONSECUTIVE_HOURS = 3; 
+const MAX_CONSECUTIVE_SLOTS = MAX_CONSECUTIVE_HOURS * 2;
+
+// --- TIME HELPERS ---
 export function timeToFloat(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours + (minutes / 60);
 }
 
-// Converts 9.5 to "09:30"
 export function floatToTime(timeFloat: number): string {
   const hours = Math.floor(timeFloat);
   const minutes = (timeFloat - hours) * 60;
   return `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : minutes}`;
 }
 
-// --- UPDATED CONSTRAINT HELPERS ---
+// --- CONSTRAINT HELPERS ---
 function isAvailable(tutor: Tutor, day: DayOfWeek, timeSlot: number): boolean {
   return tutor.availability.some(slot => {
     if (slot.day !== day) return false;
     const start = timeToFloat(slot.startTime);
     const end = timeToFloat(slot.endTime);
-    // They must be available for the full 30-minute block
     return timeSlot >= start && (timeSlot + 0.5) <= end;
   });
 }
@@ -42,20 +43,33 @@ function isAlreadyWorking(tutorId: string, day: DayOfWeek, timeSlot: number, cur
 export function generateSchedule(tutors: Tutor[]): Shift[] {
   const schedule: Shift[] = [];
   const hoursAssigned: Record<string, number> = {};
+  
+  // Initialize hours tracker
   tutors.forEach(t => hoursAssigned[t.id] = 0);
 
   for (const day of DAYS) {
+    // Reset fatigue trackers at the start of every day
+    const consecutiveSlotsToday: Record<string, number> = {};
+    tutors.forEach(t => consecutiveSlotsToday[t.id] = 0);
+
     for (let timeSlot = START_HOUR; timeSlot < END_HOUR; timeSlot += 0.5) {
       
       let eligibleTutors = tutors.filter(tutor => {
         const canWork = isAvailable(tutor, day, timeSlot);
         const notWorking = !isAlreadyWorking(tutor.id, day, timeSlot, schedule);
         const underMaxHours = hoursAssigned[tutor.id] < tutor.maxHours;
-        return canWork && notWorking && underMaxHours;
+        
+        // NEW FATIGUE CHECK: Are they under the consecutive limit?
+        const notFatigued = consecutiveSlotsToday[tutor.id] < MAX_CONSECUTIVE_SLOTS;
+
+        return canWork && notWorking && underMaxHours && notFatigued;
       });
 
       const coveredSubjectsThisSlot = new Set<string>();
       let tutorsScheduledThisSlot = 0;
+      
+      // Keep track of who wins a shift in this specific 30-min block
+      const scheduledThisBlock = new Set<string>();
 
       while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < IDEAL_TUTORS_PER_HOUR) {
         eligibleTutors.sort((a, b) => {
@@ -87,9 +101,21 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
         hoursAssigned[winner.id] += 0.5;
         winner.subjects.forEach(sub => coveredSubjectsThisSlot.add(sub));
         tutorsScheduledThisSlot++;
+        scheduledThisBlock.add(winner.id);
 
         eligibleTutors = eligibleTutors.filter(t => t.id !== winner.id);
       }
+
+      // AFTER THE BLOCK IS SCHEDULED: Update fatigue for EVERY tutor
+      tutors.forEach(tutor => {
+        if (scheduledThisBlock.has(tutor.id)) {
+          // If they worked, increase their streak
+          consecutiveSlotsToday[tutor.id] += 1;
+        } else {
+          // If they didn't work (for any reason), their streak resets to zero!
+          consecutiveSlotsToday[tutor.id] = 0;
+        }
+      });
     }
   }
 

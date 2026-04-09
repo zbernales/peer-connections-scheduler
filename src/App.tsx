@@ -5,9 +5,36 @@ import { TutorForm } from './components/TutorForm';
 import { useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Tutor, DayOfWeek } from './types';
+import type { Tutor, DayOfWeek, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+// Helper to visually merge contiguous 30-minute shifts
+function mergeShiftsForUI(shifts: Shift[]) {
+  if (shifts.length === 0) return [];
+
+  const merged = [];
+  // Start the first block
+  let currentBlock = { ...shifts[0] };
+
+  for (let i = 1; i < shifts.length; i++) {
+    const nextShift = shifts[i];
+
+    // If the next shift is on the same day AND starts exactly when the current one ends...
+    if (nextShift.day === currentBlock.day && nextShift.startTime === currentBlock.endTime) {
+      // Extend the current block's end time
+      currentBlock.endTime = nextShift.endTime;
+    } else {
+      // Otherwise, save the completed block and start a new one
+      merged.push(currentBlock);
+      currentBlock = { ...nextShift };
+    }
+  }
+  // Don't forget to push the very last block!
+  merged.push(currentBlock);
+
+  return merged;
+}
 
 // We extract the Navigation into its own component so it has access to useLocation()
 // This lets us highlight the active tab based on the URL!
@@ -72,7 +99,7 @@ function App() {
             <Route path="/submit" element={
               <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                 <TutorForm onSubmit={(newTutor) => {
-                  alert(`Success! ${newTutor.name}'s availability has been submitted to the database.`);
+                  alert(`${newTutor.name}'s availability has been submitted.`);
                 }} />
               </div>
             } />
@@ -140,9 +167,10 @@ function App() {
                           <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
                         ) : (
                           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
-                            {tutorShifts.map(shift => (
-                              <li key={shift.id} style={{ marginBottom: '0.25rem' }}>
-                                <strong>{shift.day}:</strong> {shift.startTime} - {shift.endTime}
+                            {/* Pass the sorted shifts through our merger before rendering */}
+                            {mergeShiftsForUI(tutorShifts).map((block, index) => (
+                              <li key={index} style={{ marginBottom: '0.25rem' }}>
+                                <strong>{block.day}:</strong> {block.startTime} - {block.endTime}
                               </li>
                             ))}
                           </ul>

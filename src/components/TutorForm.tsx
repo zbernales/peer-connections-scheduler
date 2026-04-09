@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AvailabilityGrid } from './AvailabilityGrid';
+import { SubjectSelector } from './SubjectSelector';
 import type { Tutor, TimeSlot, DayOfWeek } from '../types';
 
 interface TutorFormProps {
@@ -10,7 +11,7 @@ interface TutorFormProps {
 
 export function TutorForm({ onSubmit }: TutorFormProps) {
   const [name, setName] = useState('');
-  const [subjectsInput, setSubjectsInput] = useState('');
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [minHours, setMinHours] = useState<number>(2);
   const [maxHours, setMaxHours] = useState<number>(10);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,10 +29,11 @@ export function TutorForm({ onSubmit }: TutorFormProps) {
 
     setIsSubmitting(true);
 
-    const subjectsArray = subjectsInput
-      .split(',')
-      .map(s => s.trim().toUpperCase())
-      .filter(s => s !== '');
+    if (selectedSubjects.length === 0) {
+      alert("Please select at least one subject!");
+      setIsSubmitting(false);
+      return;
+    }
 
     // Convert the Grid Set back into the TimeSlot array our algorithm expects
     const availability: TimeSlot[] = Array.from(selectedSlots).map(slotId => {
@@ -57,7 +59,7 @@ export function TutorForm({ onSubmit }: TutorFormProps) {
     const newTutor: Tutor = {
       id: crypto.randomUUID(),
       name,
-      subjects: subjectsArray,
+      subjects: selectedSubjects,
       minHours,
       maxHours,
       availability
@@ -69,7 +71,7 @@ export function TutorForm({ onSubmit }: TutorFormProps) {
 
       // Reset form
       setName('');
-      setSubjectsInput('');
+      setSelectedSubjects([]);
       setSelectedSlots(new Set());
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -90,8 +92,11 @@ export function TutorForm({ onSubmit }: TutorFormProps) {
         </div>
         
         <div>
-          <label><strong>Subjects (comma separated):</strong></label><br/>
-          <input required value={subjectsInput} onChange={e => setSubjectsInput(e.target.value)} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} placeholder="e.g., CS146, MATH32" />
+          <label><strong>Courses Tutoring:</strong></label><br/>
+          <SubjectSelector 
+            selectedSubjects={selectedSubjects} 
+            onChange={setSelectedSubjects} 
+          />
         </div>
 
         <div style={{ display: 'flex', gap: '1rem' }}>

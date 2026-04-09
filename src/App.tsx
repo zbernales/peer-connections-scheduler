@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { generateSchedule, timeToFloat } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
-import { useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
+import { TutorScheduleGrid } from './components/TutorScheduleGrid';
 import type { Tutor, DayOfWeek } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -67,7 +67,6 @@ function getMergedDailySchedule(dailyShifts: any[]) {
   if (dailyShifts.length === 0) return [];
 
   // 1. Sort by Tutor ID first, THEN by Time
-  // This groups all of Alice's shifts together, followed by all of George's, etc.
   const groupedByTutor = [...dailyShifts].sort((a, b) => {
     if (a.tutorId === b.tutorId) {
       return timeToFloat(a.startTime) - timeToFloat(b.startTime);
@@ -82,8 +81,6 @@ function getMergedDailySchedule(dailyShifts: any[]) {
   return mergedBlocks.sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime));
 }
 
-// We extract the Navigation into its own component so it has access to useLocation()
-// This lets us highlight the active tab based on the URL!
 function NavBar() {
   const location = useLocation();
   const currentPath = location.pathname;
@@ -111,22 +108,21 @@ function NavBar() {
 
 function App() {
   // --- Global State ---
- // Start with an empty array instead of mock data
   const [roster, setRoster] = useState<Tutor[]>([]);
+  const [selectedTutorModal, setSelectedTutorModal] = useState<Tutor | null>(null);
+  const [hoveredTutorId, setHoveredTutorId] = useState<string | null>(null);
 
   // Set up the real-time listener
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'tutors'), (snapshot) => {
-      // Every time the database changes, this runs and updates our state
       const tutorsData = snapshot.docs.map(doc => doc.data() as Tutor);
       setRoster(tutorsData);
     });
 
-    // Cleanup the listener when the app closes
     return () => unsubscribe();
   }, []);
   
-  // --- Derived Data (Only used by Admin Dashboard) ---
+  // --- Derived Data ---
   const schedule = generateSchedule(roster);
   const allSubjects = Array.from(
     new Set(roster.flatMap(tutor => tutor.subjects))
@@ -172,7 +168,6 @@ function App() {
                         {daysShifts.length === 0 ? (
                           <p style={{ color: 'gray', fontStyle: 'italic' }}>No shifts scheduled.</p>
                         ) : (
-                        // Pass the daily shifts through our new 3-step pipeline!
                         getMergedDailySchedule(daysShifts).map((block, index) => {
                           const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
                           return (
@@ -202,24 +197,65 @@ function App() {
 
                     const totalHours = tutorShifts.length * 0.5;
 
+                    const isHovered = hoveredTutorId === tutor.id;
+
                     return (
-                      <div key={tutor.id} style={{ border: '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: '#fff' }}>
-                        <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
+                      <div 
+                        key={tutor.id} 
+                        onClick={() => setSelectedTutorModal(tutor)}
+                        onMouseEnter={() => setHoveredTutorId(tutor.id)}
+                        onMouseLeave={() => setHoveredTutorId(null)}
+                        style={{ 
+                          border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', 
+                          padding: '1.5rem', 
+                          borderRadius: '8px', 
+                          backgroundColor: isHovered ? '#f8fafc' : '#fff', 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s ease', 
+                          boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)',
+                          transform: isHovered ? 'translateY(-4px)' : 'none',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
+                          {/* A little pop-out arrow icon in the corner */}
+                          <span style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
+                        </div>
+
                         <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours ? '#ef4444' : '#10b981' }}>
                           <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
                         </p>
-                        {tutorShifts.length === 0 ? (
-                          <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
-                        ) : (
-                          <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
-                            {/* Pass the sorted shifts through our merger before rendering */}
-                            {mergeShiftsForUI(tutorShifts).map((block, index) => (
-                              <li key={index} style={{ marginBottom: '0.25rem' }}>
-                                <strong>{block.day}:</strong> {block.startTime} - {block.endTime}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                        
+                        <div style={{ flexGrow: 1 }}>
+                          {tutorShifts.length === 0 ? (
+                            <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
+                          ) : (
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
+                              {mergeShiftsForUI(tutorShifts).map((block, index) => (
+                                <li key={index} style={{ marginBottom: '0.25rem' }}>
+                                  <strong>{block.day}:</strong> {block.startTime} - {block.endTime}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+
+                        {/* Explicit Call to Action at the bottom */}
+                        <div style={{ 
+                          marginTop: '1.5rem', 
+                          paddingTop: '1rem', 
+                          borderTop: '1px solid #e2e8f0', 
+                          color: '#3b82f6', 
+                          fontSize: '0.9rem', 
+                          fontWeight: 'bold', 
+                          textAlign: 'center',
+                          opacity: isHovered ? 1 : 0.7,
+                          transition: 'opacity 0.2s'
+                        }}>
+                          Click to view full schedule
+                        </div>
                       </div>
                     );
                   })}
@@ -243,25 +279,60 @@ function App() {
                           <p style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ No coverage this week!</p>
                         ) : (
                           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
-    {/* Pass subjectShifts through our new Weekly Pipeline! */}
-    {getMergedWeeklySchedule(subjectShifts).map((block, index) => {
-      const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
-      return (
-        <li key={index} style={{ marginBottom: '0.25rem' }}>
-          <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
-        </li>
-      );
-    })}
-  </ul>
+                            {getMergedWeeklySchedule(subjectShifts).map((block, index) => {
+                              const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
+                              return (
+                                <li key={index} style={{ marginBottom: '0.25rem' }}>
+                                  <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         )}
                       </div>
                     );
                   })}
                 </div>
+
+                {/* ✅ FIX 2: The Modal is now safely inside the Admin route's fragment! */}
+                {selectedTutorModal && (
+                  <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+                  }}>
+                    <div style={{
+                      backgroundColor: 'white', padding: '2rem', borderRadius: '8px',
+                      maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h2 style={{ margin: 0 }}>{selectedTutorModal.name}'s Schedule Details</h2>
+                        <button 
+                          onClick={() => setSelectedTutorModal(null)}
+                          style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}
+                        >
+                          &times;
+                        </button>
+                      </div>
+
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <p style={{ margin: '0 0 0.5rem 0' }}><strong>Subjects:</strong> {selectedTutorModal.subjects.join(', ')}</p>
+                        <p style={{ margin: 0 }}><strong>Hours Target:</strong> {selectedTutorModal.minHours} - {selectedTutorModal.maxHours} hrs/week</p>
+                      </div>
+
+                      <TutorScheduleGrid 
+                        tutor={selectedTutorModal} 
+                        shifts={schedule.filter(s => s.tutorId === selectedTutorModal.id)} 
+                      />
+
+                    </div>
+                  </div>
+                )}
               </>
             } />
 
-            {/* --- DEFAULT ROUTE (Redirects to /submit if URL is empty) --- */}
+            {/* --- DEFAULT ROUTE --- */}
             <Route path="*" element={<Navigate to="/submit" replace />} />
 
           </Routes>

@@ -35,6 +35,53 @@ function mergeShiftsForUI(shifts: any[]) {
   return merged;
 }
 
+// Helper specifically for the Subject Matrix to handle weekly overlapping tutors
+function getMergedWeeklySchedule(weeklyShifts: any[]) {
+  if (weeklyShifts.length === 0) return [];
+
+  // 1. Group by Tutor FIRST, then by Day, then by Time
+  const groupedByTutor = [...weeklyShifts].sort((a, b) => {
+    if (a.tutorId !== b.tutorId) {
+      return a.tutorId.localeCompare(b.tutorId); // Group all of Bob's shifts, then Dan's
+    }
+    if (a.day !== b.day) {
+      return DAYS.indexOf(a.day) - DAYS.indexOf(b.day); // Keep days in order
+    }
+    return timeToFloat(a.startTime) - timeToFloat(b.startTime); // Keep times in order
+  });
+
+  // 2. Now that the blocks are safely grouped, merge them!
+  const mergedBlocks = mergeShiftsForUI(groupedByTutor);
+
+  // 3. Finally, sort the merged blocks chronologically for the UI (Day first, then Time)
+  return mergedBlocks.sort((a, b) => {
+    if (a.day !== b.day) {
+      return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
+    }
+    return timeToFloat(a.startTime) - timeToFloat(b.startTime);
+  });
+}
+
+// Helper specifically for the Master Schedule to fix interleaved tutors
+function getMergedDailySchedule(dailyShifts: any[]) {
+  if (dailyShifts.length === 0) return [];
+
+  // 1. Sort by Tutor ID first, THEN by Time
+  // This groups all of Alice's shifts together, followed by all of George's, etc.
+  const groupedByTutor = [...dailyShifts].sort((a, b) => {
+    if (a.tutorId === b.tutorId) {
+      return timeToFloat(a.startTime) - timeToFloat(b.startTime);
+    }
+    return a.tutorId.localeCompare(b.tutorId);
+  });
+
+  // 2. Now that they are grouped, our merger will catch every continuous block
+  const mergedBlocks = mergeShiftsForUI(groupedByTutor);
+
+  // 3. Finally, sort the merged blocks chronologically so the column reads top-to-bottom
+  return mergedBlocks.sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime));
+}
+
 // We extract the Navigation into its own component so it has access to useLocation()
 // This lets us highlight the active tab based on the URL!
 function NavBar() {
@@ -125,19 +172,18 @@ function App() {
                         {daysShifts.length === 0 ? (
                           <p style={{ color: 'gray', fontStyle: 'italic' }}>No shifts scheduled.</p>
                         ) : (
-                          daysShifts
-                            .sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime))
-                            .map(shift => {
-                              const tutorName = roster.find(t => t.id === shift.tutorId)?.name || 'Unknown';
-                              return (
-                                <div key={shift.id} style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderLeft: '4px solid #3b82f6', borderRadius: '4px' }}>
-                                  <strong>{shift.startTime} - {shift.endTime}</strong><br />
-                                  👨‍🏫 {tutorName}<br />
-                                  <span style={{ fontSize: '0.85em', color: '#555' }}>{shift.subjects.join(', ')}</span>
-                                </div>
-                              );
-                          })
-                        )}
+                        // Pass the daily shifts through our new 3-step pipeline!
+                        getMergedDailySchedule(daysShifts).map((block, index) => {
+                          const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
+                          return (
+                            <div key={index} style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderLeft: '4px solid #3b82f6', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                              <strong>{block.startTime} - {block.endTime}</strong><br />
+                              👨‍🏫 {tutorName}<br />
+                              <span style={{ fontSize: '0.85em', color: '#555' }}>{block.subjects.join(', ')}</span>
+                            </div>
+                          );
+                        })
+                      )}
                       </div>
                     );
                   })}
@@ -197,16 +243,16 @@ function App() {
                           <p style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ No coverage this week!</p>
                         ) : (
                           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
-                            {/* Pass subjectShifts through the upgraded merger */}
-                            {mergeShiftsForUI(subjectShifts).map((block, index) => {
-                              const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
-                              return (
-                                <li key={index} style={{ marginBottom: '0.25rem' }}>
-                                  <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
-                                </li>
-                              );
-                            })}
-                          </ul>
+    {/* Pass subjectShifts through our new Weekly Pipeline! */}
+    {getMergedWeeklySchedule(subjectShifts).map((block, index) => {
+      const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
+      return (
+        <li key={index} style={{ marginBottom: '0.25rem' }}>
+          <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
+        </li>
+      );
+    })}
+  </ul>
                         )}
                       </div>
                     );

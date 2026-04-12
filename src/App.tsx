@@ -5,6 +5,7 @@ import { TutorForm } from './components/TutorForm';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { TutorScheduleGrid } from './components/TutorScheduleGrid';
+import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
 import type { Tutor, DayOfWeek } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -111,6 +112,8 @@ function App() {
   const [roster, setRoster] = useState<Tutor[]>([]);
   const [selectedTutorModal, setSelectedTutorModal] = useState<Tutor | null>(null);
   const [hoveredTutorId, setHoveredTutorId] = useState<string | null>(null);
+  const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
+  const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
 
   // Set up the real-time listener
   useEffect(() => {
@@ -173,7 +176,7 @@ function App() {
                           return (
                             <div key={index} style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderLeft: '4px solid #3b82f6', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                               <strong>{block.startTime} - {block.endTime}</strong><br />
-                              👨‍🏫 {tutorName}<br />
+                              {tutorName}<br />
                               <span style={{ fontSize: '0.85em', color: '#555' }}>{block.subjects.join(', ')}</span>
                             </div>
                           );
@@ -266,35 +269,73 @@ function App() {
                 <h2>3. Subject Coverage Matrix</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', paddingBottom: '3rem' }}>
                   {allSubjects.map(subject => {
+                    // 1. Filter the shifts for this specific subject
                     const subjectShifts = schedule.filter(s => s.subjects.includes(subject));
-                    subjectShifts.sort((a, b) => {
-                      if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
-                      return timeToFloat(a.startTime) - timeToFloat(b.startTime);
-                    });
+                    
+                    // 2. Check if the mouse is currently hovering over THIS card
+                    const isHovered = hoveredSubject === subject;
 
+                    // 3. Return the card UI!
                     return (
-                      <div key={subject} style={{ border: '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
-                        <h3 style={{ marginTop: 0, color: '#0f172a' }}>📚 {subject}</h3>
-                        {subjectShifts.length === 0 ? (
-                          <p style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ No coverage this week!</p>
-                        ) : (
-                          <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
-                            {getMergedWeeklySchedule(subjectShifts).map((block, index) => {
-                              const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
-                              return (
-                                <li key={index} style={{ marginBottom: '0.25rem' }}>
-                                  <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
+                      <div 
+                        key={subject} 
+                        onClick={() => setSelectedSubjectModal(subject)}
+                        onMouseEnter={() => setHoveredSubject(subject)}
+                        onMouseLeave={() => setHoveredSubject(null)}
+                        style={{ 
+                          border: isHovered ? '2px solid #10b981' : '1px solid #e2e8f0', 
+                          padding: '1.5rem', 
+                          borderRadius: '8px', 
+                          backgroundColor: isHovered ? '#ecfdf5' : '#f8fafc', 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s ease', 
+                          boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none',
+                          transform: isHovered ? 'translateY(-4px)' : 'none',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <h3 style={{ marginTop: 0, color: '#0f172a' }}>📚 {subject}</h3>
+                          <span style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
+                        </div>
+
+                        <div style={{ flexGrow: 1, marginTop: '1rem' }}>
+                          {subjectShifts.length === 0 ? (
+                            <p style={{ color: '#ef4444', fontWeight: 'bold', margin: 0 }}>⚠️ No coverage this week!</p>
+                          ) : (
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
+                              {getMergedWeeklySchedule(subjectShifts).map((block, index) => {
+                                const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
+                                return (
+                                  <li key={index} style={{ marginBottom: '0.25rem' }}>
+                                    <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+
+                        {/* Explicit Call to Action at the bottom */}
+                        <div style={{ 
+                          marginTop: '1.5rem', 
+                          paddingTop: '1rem', 
+                          borderTop: '1px solid #e2e8f0', 
+                          color: '#10b981', 
+                          fontSize: '0.9rem', 
+                          fontWeight: 'bold', 
+                          textAlign: 'center',
+                          opacity: isHovered ? 1 : 0.7,
+                          transition: 'opacity 0.2s'
+                        }}>
+                          Click to view coverage map
+                        </div>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* ✅ FIX 2: The Modal is now safely inside the Admin route's fragment! */}
                 {selectedTutorModal && (
                   <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -324,6 +365,38 @@ function App() {
                       <TutorScheduleGrid 
                         tutor={selectedTutorModal} 
                         shifts={schedule.filter(s => s.tutorId === selectedTutorModal.id)} 
+                      />
+
+                    </div>
+                  </div>
+                )}
+                {/* --- SUBJECT DETAILS MODAL --- */}
+                {selectedSubjectModal && (
+                  <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+                  }}>
+                    <div style={{
+                      backgroundColor: 'white', padding: '2rem', borderRadius: '8px',
+                      maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h2 style={{ margin: 0 }}>📚 {selectedSubjectModal} Coverage</h2>
+                        <button 
+                          onClick={() => setSelectedSubjectModal(null)}
+                          style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}
+                        >
+                          &times;
+                        </button>
+                      </div>
+
+                      {/* Render our new Subject Grid visualizer! */}
+                      <SubjectScheduleGrid 
+                        subject={selectedSubjectModal} 
+                        shifts={schedule.filter(s => s.subjects.includes(selectedSubjectModal))} 
+                        roster={roster}
                       />
 
                     </div>

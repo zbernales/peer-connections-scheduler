@@ -1,4 +1,3 @@
-// src/components/SubjectScheduleGrid.tsx
 import { useState } from 'react';
 import type { Shift, DayOfWeek, Tutor } from '../types';
 import { timeToFloat, floatToTime } from '../utils/scheduler';
@@ -17,7 +16,7 @@ for (let i = 9; i < 17; i += 0.5) {
   TIMES.push(floatToTime(i));
 }
 
-export function SubjectScheduleGrid({ subject, shifts, roster }: SubjectScheduleGridProps) {
+export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   // 1. Build a dictionary mapping "Day-Time" to an Array of Tutor Names

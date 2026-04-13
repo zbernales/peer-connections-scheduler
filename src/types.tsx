@@ -23,3 +23,10 @@ export interface Shift {
   startTime: string;
   endTime: string;
 }
+
+export interface ScheduleConfig {
+  tutorsPerHour: number;
+  maxConsecutiveHours: number;
+  minCooldownHours: number;
+  maxHoursPerDay: number;
+}

@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { generateSchedule, timeToFloat } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
+import { RosterDashboard } from './components/RosterDashboard';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { TutorScheduleGrid } from './components/TutorScheduleGrid';
 import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
-import type { Tutor, DayOfWeek } from './types';
+import type { Tutor, DayOfWeek, ScheduleConfig } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -114,6 +115,12 @@ function App() {
   const [hoveredTutorId, setHoveredTutorId] = useState<string | null>(null);
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
+  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
+    tutorsPerHour: 3,
+    maxConsecutiveHours: 3,
+    minCooldownHours: 1.5,
+    maxHoursPerDay: 4
+  });
 
   // Set up the real-time listener
   useEffect(() => {
@@ -126,7 +133,7 @@ function App() {
   }, []);
   
   // --- Derived Data ---
-  const schedule = generateSchedule(roster);
+  const schedule = generateSchedule(roster, scheduleConfig);
   const allSubjects = Array.from(
     new Set(roster.flatMap(tutor => tutor.subjects))
   ).sort();
@@ -149,8 +156,18 @@ function App() {
               </div>
             } />
 
-            {/* --- ROUTE 2: THE SCHEDULER DASHBOARD (/admin) --- */}
+            {/* THE NEW MAIN PAGE */}
             <Route path="/admin" element={
+              <RosterDashboard 
+                roster={roster} 
+                config={scheduleConfig} 
+                onConfigChange={setScheduleConfig}
+                onSelectTutor={setSelectedTutorModal}
+              />
+            } />
+
+            {/* --- ROUTE 2: THE SCHEDULER DASHBOARD (/admin) --- */}
+            <Route path="/schedule" element={
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h1>Master Schedule Dashboard</h1>

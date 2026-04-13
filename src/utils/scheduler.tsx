@@ -1,5 +1,5 @@
-import type { Tutor, Shift, DayOfWeek } from '../types';
-
+import type { Tutor, Shift, DayOfWeek, ScheduleConfig } from '../types';
+ 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const START_HOUR = 9;  // 9.0 = 9:00 AM
 const END_HOUR = 17;   // 17.0 = 5:00 PM
@@ -44,10 +44,14 @@ function isAlreadyWorking(tutorId: string, day: DayOfWeek, timeSlot: number, cur
 }
 
 // --- THE SCHEDULER ---
-export function generateSchedule(tutors: Tutor[]): Shift[] {
+export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift[] {
   const schedule: Shift[] = [];
   const hoursAssigned: Record<string, number> = {};
   tutors.forEach(t => hoursAssigned[t.id] = 0);
+
+  // Convert the dynamic config hours into 30-minute slots for the loop
+  const maxConsecutiveSlots = config.maxConsecutiveHours * 2;
+  const minCooldownSlots = config.minCooldownHours * 2;
 
   for (const day of DAYS) {
     const consecutiveSlotsToday: Record<string, number> = {};
@@ -66,7 +70,8 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
         const canWork = isAvailable(tutor, day, timeSlot);
         const notWorking = !isAlreadyWorking(tutor.id, day, timeSlot, schedule);
         const underWeeklyMax = hoursAssigned[tutor.id] < tutor.maxHours;
-        const underDailyMax = hoursAssignedToday[tutor.id] < MAX_HOURS_PER_DAY;
+        // Use the dynamic daily max from config
+        const underDailyMax = hoursAssignedToday[tutor.id] < config.maxHoursPerDay;
         const notOnCooldown = cooldownRemaining[tutor.id] === 0;
 
         return canWork && notWorking && underWeeklyMax && underDailyMax && notOnCooldown;
@@ -76,7 +81,8 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
       let tutorsScheduledThisSlot = 0;
       const scheduledThisBlock = new Set<string>();
 
-      while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < IDEAL_TUTORS_PER_HOUR) {
+      // Use the dynamic tutorsPerHour from config
+      while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < config.tutorsPerHour) {
         eligibleTutors.sort((a, b) => {
           
           // 1. SHIFT MOMENTUM: If you are already working, you get priority to KEEP working
@@ -127,9 +133,9 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
           // They worked this slot
           consecutiveSlotsToday[tutor.id] += 1;
           
-          // Did they just hit the 3-hour fatigue limit?
-          if (consecutiveSlotsToday[tutor.id] >= MAX_CONSECUTIVE_SLOTS) {
-            cooldownRemaining[tutor.id] = MIN_COOLDOWN_SLOTS; 
+          // Did they just hit the fatigue limit based on dynamic config?
+          if (consecutiveSlotsToday[tutor.id] >= maxConsecutiveSlots) {
+            cooldownRemaining[tutor.id] = minCooldownSlots; 
             consecutiveSlotsToday[tutor.id] = 0; 
           }
         } else {
@@ -142,7 +148,7 @@ export function generateSchedule(tutors: Tutor[]): Shift[] {
             // They were working previously, but didn't get this slot.
             // Force them into a full cooldown so they don't get a 30-minute gap!
             // We subtract 1 because they are already sitting out this current slot.
-            cooldownRemaining[tutor.id] = MIN_COOLDOWN_SLOTS - 1; 
+            cooldownRemaining[tutor.id] = minCooldownSlots - 1; 
             consecutiveSlotsToday[tutor.id] = 0;
           }
         }

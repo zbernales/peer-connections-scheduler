@@ -4,7 +4,6 @@ import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import type { Shift } from '../types';
 
-// 1. Define the exact shape of our saved database document
 interface SavedScheduleDoc {
   id: string;
   name: string;
@@ -13,23 +12,21 @@ interface SavedScheduleDoc {
 }
 
 interface SavedSchedulesProps {
-  onLoadSchedule: (shifts: Shift[]) => void;
+  // NEW: Now passes the ID and Name back to App.tsx
+  onLoadSchedule: (id: string, name: string, shifts: Shift[]) => void; 
 }
 
 export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
-  // 2. Tell the state to use our new interface
   const [savedSchedules, setSavedSchedules] = useState<SavedScheduleDoc[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'schedules'), (snapshot) => {
-      // 3. Cast the raw Firebase data as our specific document type
       const schedulesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as SavedScheduleDoc));
       
-      // Now TypeScript knows createdAt exists and is a number!
       schedulesData.sort((a, b) => b.createdAt - a.createdAt);
       setSavedSchedules(schedulesData);
     });
@@ -49,11 +46,10 @@ export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
     }
   };
 
-// ... keep the rest of the file exactly the same
-
-  const handleLoad = (shifts: Shift[]) => {
-    onLoadSchedule(shifts);
-    navigate('/schedule'); // Take them directly to the dashboard to see it!
+  // NEW: Passes the metadata along with the shifts
+  const handleLoad = (id: string, name: string, shifts: Shift[]) => {
+    onLoadSchedule(id, name, shifts);
+    navigate('/schedule'); 
   };
 
   return (
@@ -75,7 +71,7 @@ export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
           savedSchedules.map(schedule => (
             <div 
               key={schedule.id}
-              onClick={() => handleLoad(schedule.shifts)}
+              onClick={() => handleLoad(schedule.id, schedule.name, schedule.shifts)}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; }}
@@ -89,7 +85,7 @@ export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
               
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); handleLoad(schedule.shifts); }}
+                  onClick={(e) => { e.stopPropagation(); handleLoad(schedule.id, schedule.name, schedule.shifts); }}
                   style={{ padding: '0.5rem 1rem', backgroundColor: '#ecfdf5', color: '#10b981', border: '1px solid #10b981', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                 >
                   Load

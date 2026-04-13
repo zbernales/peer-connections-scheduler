@@ -196,7 +196,7 @@ function NavBar() {
         to="/admin"
         style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}
       >
-        Schedule Dashboard
+        Roster Dashboard
       </Link>
     </nav>
   );
@@ -234,22 +234,6 @@ function App() {
   const handleGenerateSchedule = () => {
     const generated = generateSchedule(roster, scheduleConfig);
     setSchedule(generated);
-  };
-
-  // This function handles saving our manual edits from the Master Schedule dropdown
-  const handleSaveShiftOverride = (newTutorId: string) => {
-    if (!editingShiftBlock) return;
-    
-    // Create a new copy of the schedule with the updated tutor
-    const updatedSchedule = schedule.map(shift => {
-      if (editingShiftBlock.shiftIds.includes(shift.id)) {
-        return { ...shift, tutorId: newTutorId };
-      }
-      return shift;
-    });
-
-    setSchedule(updatedSchedule);
-    setEditingShiftBlock(null);
   };
 
   // --- Manual Grid Override Logic for the Tutor Modal ---

@@ -4,7 +4,7 @@ const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday
 const START_HOUR = 9;  // 9.0 = 9:00 AM
 const END_HOUR = 17;   // 17.0 = 5:00 PM
 
-export const MAX_CONSECUTIVE_HOURS = 3; 
+export const MAX_CONSECUTIVE_HOURS = 5; 
 export const MIN_COOLDOWN_HOURS = 1.5;
 export const MAX_HOURS_PER_DAY = 5;
 

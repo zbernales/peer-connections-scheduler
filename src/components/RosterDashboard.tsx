@@ -10,9 +10,10 @@ interface RosterDashboardProps {
   config: ScheduleConfig;
   onConfigChange: (newConfig: ScheduleConfig) => void;
   onSelectTutor: (tutor: Tutor) => void;
+  onGenerate: () => void; // <-- ADDED THIS!
 }
 
-export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor }: RosterDashboardProps) {
+export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor, onGenerate }: RosterDashboardProps) { // <-- ADDED HERE!
   const navigate = useNavigate();
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
 
@@ -44,10 +45,13 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
       {/* LEFT COLUMN: Settings & Actions */}
       <div style={{ flex: '0 0 350px', position: 'sticky', top: '2rem' }}>
         <button 
-          onClick={() => navigate('/schedule')}
+          onClick={() => {
+            onGenerate(); // <-- RUNS THE ALGORITHM FIRST!
+            navigate('/schedule'); // <-- THEN MOVES TO THE PAGE!
+          }}
           style={{ width: '100%', padding: '1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '2rem', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)' }}
         >
-          ✨ Generate Schedule
+          Generate Schedule
         </button>
 
         <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -99,8 +103,6 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
               </div>
               
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {/* Edit just opens the modal for now, we will add the form to the modal next! */}
-                {/* Change the old dummy Edit button to this: */}
                 <button 
                     onClick={(e) => { 
                     e.stopPropagation(); // Prevents clicking the row behind the button
@@ -117,6 +119,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
           {roster.length === 0 && <p style={{ color: '#64748b' }}>No tutors found. Click "Add Tutor" to get started.</p>}
         </div>
       </div>
+      
       {/* THE EDIT TUTOR MODAL */}
       {editingTutor && (
         <div style={{
@@ -131,7 +134,6 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
           }}>
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Edit {editingTutor.name}'s Profile</h2>
             
-            {/* We reuse the exact same form, just pass in the initialData! */}
             <TutorForm 
               initialData={editingTutor} 
               onSubmit={handleSaveEdit} 

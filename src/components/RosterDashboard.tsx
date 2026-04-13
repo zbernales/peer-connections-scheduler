@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
+import { useState } from 'react';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -12,6 +14,7 @@ interface RosterDashboardProps {
 
 export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor }: RosterDashboardProps) {
   const navigate = useNavigate();
+  const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
 
   const handleDelete = async (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Don't trigger the row click
@@ -22,6 +25,16 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
         console.error("Error deleting tutor:", error);
         alert("Failed to delete tutor.");
       }
+    }
+  };
+
+  const handleSaveEdit = async (updatedTutorData: any) => {
+    try {
+      await updateDoc(doc(db, 'tutors', updatedTutorData.id), updatedTutorData);
+      setEditingTutor(null); // Close the modal
+    } catch (error) {
+      console.error("Error updating tutor:", error);
+      alert("Failed to update tutor.");
     }
   };
 
@@ -87,7 +100,16 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
               
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {/* Edit just opens the modal for now, we will add the form to the modal next! */}
-                <button style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}>Edit</button>
+                {/* Change the old dummy Edit button to this: */}
+                <button 
+                    onClick={(e) => { 
+                    e.stopPropagation(); // Prevents clicking the row behind the button
+                    setEditingTutor(tutor); 
+                    }} 
+                    style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}
+                >
+                    Edit
+                </button>
                 <button onClick={(e) => handleDelete(tutor.id, tutor.name, e)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444' }}>Delete</button>
               </div>
             </div>
@@ -95,6 +117,29 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor 
           {roster.length === 0 && <p style={{ color: '#64748b' }}>No tutors found. Click "Add Tutor" to get started.</p>}
         </div>
       </div>
+      {/* THE EDIT TUTOR MODAL */}
+      {editingTutor && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white', padding: '2rem', borderRadius: '8px',
+            maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Edit {editingTutor.name}'s Profile</h2>
+            
+            {/* We reuse the exact same form, just pass in the initialData! */}
+            <TutorForm 
+              initialData={editingTutor} 
+              onSubmit={handleSaveEdit} 
+              onCancel={() => setEditingTutor(null)} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

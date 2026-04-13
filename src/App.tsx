@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react
 import { generateSchedule, timeToFloat, floatToTime } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
 import { RosterDashboard } from './components/RosterDashboard';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { SavedSchedules } from './components/SavedSchedules'; // <-- NEW IMPORT
+import { collection, onSnapshot, addDoc } from 'firebase/firestore'; // <-- ADDED addDoc
 import { db } from './firebase';
 import { TutorScheduleGrid } from './components/TutorScheduleGrid';
 import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
@@ -198,6 +199,14 @@ function NavBar() {
       >
         Roster Dashboard
       </Link>
+      
+      {/* --- NEW: LINK TO SAVED SCHEDULES --- */}
+      <Link 
+        to="/saved"
+        style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}
+      >
+        Saved Schedules
+      </Link>
     </nav>
   );
 }
@@ -210,7 +219,7 @@ function App() {
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
-    tutorsPerHour: 3,
+    tutorsPerHour: 5,
     maxConsecutiveHours: 3,
     minCooldownHours: 1.5,
     maxHoursPerDay: 4
@@ -233,9 +242,9 @@ function App() {
   const handleGenerateSchedule = () => {
     const generated = generateSchedule(roster, scheduleConfig);
     setSchedule(generated);
+    setSelectedTutorModal(null);
   };
 
-  // --- Manual Grid Override Logic for the Tutor Modal ---
   // --- Bulk Save Logic for the Tutor Modal ---
   const handleSaveTutorSchedule = (tutorId: string, newTutorShifts: Shift[]) => {
     setSchedule(prevSchedule => {
@@ -245,6 +254,29 @@ function App() {
       return [...filteredSchedule, ...newTutorShifts];
     });
     setSelectedTutorModal(null); // Close the modal
+  };
+
+  // --- NEW: Save the entire active schedule to Firebase ---
+  const handleSaveToDatabase = async () => {
+    if (schedule.length === 0) {
+      alert("There is no schedule to save! Generate one first.");
+      return;
+    }
+
+    const scheduleName = window.prompt("Enter a name for this schedule (e.g., 'Midterm Week Update'):");
+    if (!scheduleName) return; 
+
+    try {
+      await addDoc(collection(db, 'schedules'), {
+        name: scheduleName,
+        createdAt: Date.now(),
+        shifts: schedule
+      });
+      alert(`"${scheduleName}" has been securely saved to the database!`);
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+      alert("Failed to save schedule.");
+    }
   };
 
   const allSubjects = Array.from(
@@ -276,8 +308,13 @@ function App() {
                 config={scheduleConfig} 
                 onConfigChange={setScheduleConfig}
                 onSelectTutor={setSelectedTutorModal}
-                onGenerate={handleGenerateSchedule} /* <-- Make sure to add this to your RosterDashboard props! */
+                onGenerate={handleGenerateSchedule}
               />
+            } />
+
+            {/* --- NEW: ROUTE 3: SAVED SCHEDULES (/saved) --- */}
+            <Route path="/saved" element={
+              <SavedSchedules onLoadSchedule={(loadedShifts) => setSchedule(loadedShifts)} />
             } />
 
             {/* --- ROUTE 2: THE SCHEDULER DASHBOARD (/schedule) --- */}
@@ -285,9 +322,20 @@ function App() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h1>Master Schedule Dashboard</h1>
-                  <span style={{ backgroundColor: '#e2e8f0', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 'bold' }}>
-                    Total Tutors: {roster.length}
-                  </span>
+                  
+                  {/* --- NEW: SAVE TO DATABASE BUTTON AND COUNTER WRAPPER --- */}
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <button 
+                      onClick={handleSaveToDatabase}
+                      style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}
+                    >
+                      💾 Save to Database
+                    </button>
+
+                    <span style={{ backgroundColor: '#e2e8f0', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 'bold' }}>
+                      Total Tutors: {roster.length}
+                    </span>
+                  </div>
                 </div>
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
@@ -316,7 +364,7 @@ function App() {
                           
 
                               <strong>{block.startTime} - {block.endTime}</strong><br />
-                              👨‍🏫 {tutorName} {isForced && <span style={{ color: '#ef4444', fontSize: '0.8em', fontWeight: 'bold' }}><br/>(Outside Availability)</span>}<br />
+                              {tutorName} {isForced && <span style={{ color: '#ef4444', fontSize: '0.8em', fontWeight: 'bold' }}><br/>(Outside Availability)</span>}<br />
                               <span style={{ fontSize: '0.85em', color: '#555' }}>{block.subjects.join(', ')}</span>
                             </div>
                           );

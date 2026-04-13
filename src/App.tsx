@@ -218,7 +218,6 @@ function App() {
 
   // --- Stateful Schedule & Editing ---
   const [schedule, setSchedule] = useState<Shift[]>([]);
-  const [editingShiftBlock, setEditingShiftBlock] = useState<any>(null);
 
   // Set up the real-time listener
   useEffect(() => {

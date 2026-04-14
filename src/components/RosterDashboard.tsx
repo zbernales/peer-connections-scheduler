@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
 import { useState } from 'react';
+import { seedDatabase } from '../utils/seedData';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -29,7 +30,6 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
     }
   };
 
-  // --- NEW: Reset Roster Logic ---
   const handleResetRoster = async () => {
     const confirmMessage = "Are you sure you want to clear the entire roster? \n\nThis will permanently delete ALL current tutors from the active database. \n\n(Your previously Saved Schedules will remain intact)";
     
@@ -45,7 +45,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         
         // Wait for all deletions to finish
         await Promise.all(deletePromises);
-        alert("Roster successfully reset for the new semester.");
+        alert("Roster successfully reset.");
       } catch (error) {
         console.error("Error resetting roster:", error);
         alert("Failed to reset roster.");
@@ -77,6 +77,21 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         >
           Generate Schedule
         </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+  
+        {/* --- Temporary Seeding Button --- */}
+        <button 
+          onClick={() => {
+            if (window.confirm("WARNING: This will add 30 fake tutors to your live database. Proceed?")) {
+              seedDatabase(30);
+            }
+          }} 
+          style={{ padding: '0.75rem 7rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          🧪 Inject 30 Fake Tutors
+        </button>
+
+      </div>
 
         <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <h3 style={{ marginTop: 0 }}>⚙️ Algorithm Settings</h3>

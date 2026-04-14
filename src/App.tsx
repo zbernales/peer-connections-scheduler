@@ -609,40 +609,7 @@ function App() {
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
 
-                <h2>1. Master Schedule</h2>
-                <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                  {DAYS.map(day => {
-                    const daysShifts = schedule.filter(s => s.day === day);
-                    return (
-                      <div key={day} style={{ border: '1px solid #ccc', padding: '1rem', minWidth: '220px', borderRadius: '8px', flex: 1 }}>
-                        <h3 style={{ marginTop: 0, borderBottom: '2px solid #eee', paddingBottom: '0.5rem' }}>{day}</h3>
-                        {daysShifts.length === 0 ? (
-                          <p style={{ color: 'gray', fontStyle: 'italic' }}>No shifts scheduled.</p>
-                        ) : (
-                        getMergedDailySchedule(daysShifts).map((block, index) => {
-                          const tutor = activeRoster.find(t => t.id === block.tutorId);
-                          const tutorName = tutor?.name || 'Unknown';
-                          const isForced = isOutsideAvailability(tutor, block);
-                          const bgColor = isForced ? '#fef2f2' : '#f8fafc'; 
-                          const borderColor = isForced ? '#ef4444' : '#3b82f6'; 
-
-                          return (
-                            <div key={index} style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: bgColor, borderLeft: `4px solid ${borderColor}`, borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', position: 'relative' }}>
-                              <strong>{format12Hour(block.startTime)} - {format12Hour(block.endTime)}</strong><br />
-                              👨‍🏫 {tutorName} {isForced && <span style={{ color: '#ef4444', fontSize: '0.8em', fontWeight: 'bold' }}><br/>(Outside Availability)</span>}<br />
-                              <span style={{ fontSize: '0.85em', color: '#555' }}>{block.subjects.join(', ')}</span>
-                            </div>
-                          );
-                        })
-                      )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <hr style={{ margin: '3rem 0' }} />
-
-                <h2>2. Tutor Breakdowns</h2>
+                <h2>Tutor Breakdowns</h2>
 
                 <div style={{ marginBottom: '1.5rem' }}>
                   <input 
@@ -737,7 +704,7 @@ function App() {
 
                 <hr style={{ margin: '3rem 0' }} />
 
-                <h2>3. Subject Coverage Matrix</h2>
+                <h2>3. Subject Coverage</h2>
 
                 <div style={{ marginBottom: '1.5rem' }}>
                   <input 

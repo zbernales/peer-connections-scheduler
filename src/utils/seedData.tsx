@@ -36,12 +36,10 @@ function getRandomItems<T>(arr: T[], count: number): T[] {
 function generateRandomAvailability(): TimeSlot[] {
   const availability: TimeSlot[] = [];
   
-  // 1. Pick 3 to 5 random days to ensure wide weekly coverage
   const workingDays = getRandomItems(DAYS, getRandomInt(3, 5));
 
   workingDays.forEach(day => {
     const startFloat1 = getRandomInt(18, 24) * 0.5; 
-    // Shift is 2 to 5 hours long
     const duration1 = getRandomInt(4, 10) * 0.5; 
     let endFloat1 = startFloat1 + duration1;
 
@@ -55,21 +53,15 @@ function generateRandomAvailability(): TimeSlot[] {
       });
     }
 
-    // --- SHIFT 2: Afternoon / Evening (SPLIT SHIFT) ---
-    // 40% chance to have a second shift, ONLY IF their first shift ended before 5:00 PM
     if (Math.random() > 0.6 && endFloat1 < 17) {
-      // Add a realistic 1 to 2.5 hour gap for a college class
       const gap = getRandomInt(2, 5) * 0.5; 
       const startFloat2 = endFloat1 + gap;
       
-      // Second shift is 2 to 4 hours long
       const duration2 = getRandomInt(4, 8) * 0.5; 
       let endFloat2 = startFloat2 + duration2;
 
-      // Cap at 7:00 PM
       if (endFloat2 > 17) endFloat2 = 17;
 
-      // Push the second block of Lego bricks
       for (let t = startFloat2; t < endFloat2; t += 0.5) {
         availability.push({
           day,

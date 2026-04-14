@@ -2,7 +2,7 @@ import type { Tutor, Shift, DayOfWeek, ScheduleConfig } from '../types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const START_HOUR = 9;  // 9.0 = 9:00 AM
-const END_HOUR = 17;   // 17.0 = 5:00 PM
+const END_HOUR = 19;   // 19.0 = 7:00 PM
 
 // --- TIME HELPERS ---
 export function timeToFloat(timeStr: string): number {
@@ -14,6 +14,14 @@ export function floatToTime(timeFloat: number): string {
   const hours = Math.floor(timeFloat);
   const minutes = Math.round((timeFloat - hours) * 60);
   return `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : minutes}`;
+}
+
+export function format12Hour(time24: string): string {
+  const [h, m] = time24.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const hr12 = h % 12 || 12;
+  const minStr = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`;
+  return `${hr12}${minStr}${ampm}`;
 }
 
 // --- CONSTRAINT HELPERS ---
@@ -33,14 +41,6 @@ function isAlreadyWorking(tutorId: string, day: DayOfWeek, timeSlot: number, cur
            timeToFloat(shift.startTime) === timeSlot;
   });
 }
-// Converts "13:30" to "1:30pm" and "09:00" to "9am"
-export function format12Hour(time24: string): string {
-  const [h, m] = time24.split(':').map(Number);
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const hr12 = h % 12 || 12;
-  const minStr = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`;
-  return `${hr12}${minStr}${ampm}`;
-}
 
 // --- THE SCHEDULER ---
 export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift[] {
@@ -50,8 +50,24 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
 
   const maxConsecutiveSlots = config.maxConsecutiveHours * 2;
   const minCooldownSlots = config.minCooldownHours * 2;
-  // Fallback to 0.5 hours (1 slot) if the config hasn't been updated yet
   const minShiftSlots = (config.minHoursPerShift || 0.5) * 2; 
+
+  // ============================================================================
+  // --- PRE-COMPUTATION ENGINE ---
+  // ============================================================================
+  
+  // Calculate Availability Scarcity
+  // (Finds out exactly how many total hours a tutor is available to work this week)
+  const tutorTotalAvailability: Record<string, number> = {};
+  tutors.forEach(tutor => {
+    let totalHours = 0;
+    tutor.availability.forEach(slot => {
+      totalHours += (timeToFloat(slot.endTime) - timeToFloat(slot.startTime));
+    });
+    tutorTotalAvailability[tutor.id] = totalHours;
+  });
+  // ============================================================================
+
 
   for (const day of DAYS) {
     const consecutiveSlotsToday: Record<string, number> = {};
@@ -73,34 +89,26 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
         const underDailyMax = hoursAssignedToday[tutor.id] < config.maxHoursPerDay;
         const notOnCooldown = cooldownRemaining[tutor.id] === 0;
 
-        // If they fail any basic check, they are out
         if (!canWork || !notWorking || !underWeeklyMax || !underDailyMax || !notOnCooldown) {
           return false;
         }
 
-        // --- NEW: MINIMUM SHIFT LENGTH LOOKAHEAD ---
-        // We only need to check the lookahead if they are about to START a brand new shift
         const isStartingNewShift = consecutiveSlotsToday[tutor.id] === 0;
 
         if (isStartingNewShift && minShiftSlots > 1) {
-          // 1. Do they have enough daily/weekly hours left to finish a minimum block?
           const remainingDaily = config.maxHoursPerDay - hoursAssignedToday[tutor.id];
           const remainingWeekly = tutor.maxHours - hoursAssigned[tutor.id];
           if (remainingDaily < (minShiftSlots * 0.5) || remainingWeekly < (minShiftSlots * 0.5)) {
-            return false; // They don't have enough hours left to work the minimum shift
+            return false; 
           }
 
-          // 2. Are they actually available for the entire minimum block?
-          // Start at i=1 because we already validated the current slot (i=0) above
           for (let i = 1; i < minShiftSlots; i++) { 
             const futureSlot = timeSlot + (i * 0.5);
-            // If the shift pushes past closing time, or they aren't available, they can't start!
             if (futureSlot >= END_HOUR || !isAvailable(tutor, day, futureSlot)) {
               return false;
             }
           }
         }
-
         return true;
       });
 
@@ -109,27 +117,45 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       const scheduledThisBlock = new Set<string>();
 
       while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < config.tutorsPerHour) {
+        
+        // ============================================================================
+        // --- THE SORTING ENGINE ---
+        // ============================================================================
         eligibleTutors.sort((a, b) => {
-          // 1. SHIFT MOMENTUM
+          
+          // PRIORITY 1: SHIFT MOMENTUM (Keep people working if they started)
           const aIsWorking = consecutiveSlotsToday[a.id] > 0;
           const bIsWorking = consecutiveSlotsToday[b.id] > 0;
           if (aIsWorking && !bIsWorking) return -1;
           if (!aIsWorking && bIsWorking) return 1;
 
-          // 2. Maximize Subject Coverage
-          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
-          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
-          if (aNewSubjects !== bNewSubjects) return bNewSubjects - aNewSubjects;
-
-          // 3. Prioritize those who need minimum hours
+          // PRIORITY 2: MINIMUM HOURS (Prioritize people under their minimums)
           const aNeedsMin = hoursAssigned[a.id] < a.minHours;
           const bNeedsMin = hoursAssigned[b.id] < b.minHours;
           if (aNeedsMin && !bNeedsMin) return -1;
           if (!aNeedsMin && bNeedsMin) return 1;
 
-          // 4. Balance total hours assigned
+          // PRIORITY 3: SCARCITY TIE-BREAKER
+          // If they BOTH need minimum hours, prioritize the tutor who has less availability
+          if (aNeedsMin && bNeedsMin) {
+            const aAvailable = tutorTotalAvailability[a.id];
+            const bAvailable = tutorTotalAvailability[b.id];
+            if (aAvailable !== bAvailable) {
+              return aAvailable - bAvailable; // Smaller availability moves to the front
+            }
+          }
+
+          // PRIORITY 4: MAXIMIZE SUBJECT COVERAGE (The Old Way - Quantity over Rarity)
+          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
+          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
+          if (aNewSubjects !== bNewSubjects) {
+            return bNewSubjects - aNewSubjects; // Higher quantity of new subjects moves to the front
+          }
+
+          // PRIORITY 5: LOAD BALANCING (If all else is equal, give it to whoever has fewer hours)
           return hoursAssigned[a.id] - hoursAssigned[b.id];
         });
+        // ============================================================================
 
         const winner = eligibleTutors[0];
 
@@ -151,11 +177,9 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
         eligibleTutors = eligibleTutors.filter(t => t.id !== winner.id);
       }
 
-      // AFTER THE BLOCK IS SCHEDULED: Update fatigue and cooldowns
       tutors.forEach(tutor => {
         if (scheduledThisBlock.has(tutor.id)) {
           consecutiveSlotsToday[tutor.id] += 1;
-          
           if (consecutiveSlotsToday[tutor.id] >= maxConsecutiveSlots) {
             cooldownRemaining[tutor.id] = minCooldownSlots; 
             consecutiveSlotsToday[tutor.id] = 0; 
@@ -171,8 +195,6 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       });
     }
   }
-
-  
 
   return schedule;
 }

@@ -2,18 +2,19 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import type { Shift } from '../types';
+import type { Shift, Tutor } from '../types'; // <-- Ensure Tutor is imported!
 
 interface SavedScheduleDoc {
   id: string;
   name: string;
   createdAt: number;
   shifts: Shift[];
+  roster?: Tutor[]; // NEW: We now save the snapshot of the roster! (Optional for backwards compatibility)
 }
 
 interface SavedSchedulesProps {
-  // NEW: Now passes the ID and Name back to App.tsx
-  onLoadSchedule: (id: string, name: string, shifts: Shift[]) => void; 
+  // NEW: Passes the roster back to App.tsx
+  onLoadSchedule: (id: string, name: string, shifts: Shift[], roster?: Tutor[]) => void; 
 }
 
 export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
@@ -46,9 +47,8 @@ export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
     }
   };
 
-  // NEW: Passes the metadata along with the shifts
-  const handleLoad = (id: string, name: string, shifts: Shift[]) => {
-    onLoadSchedule(id, name, shifts);
+  const handleLoad = (id: string, name: string, shifts: Shift[], roster?: Tutor[]) => {
+    onLoadSchedule(id, name, shifts, roster);
     navigate('/schedule'); 
   };
 
@@ -71,7 +71,7 @@ export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
           savedSchedules.map(schedule => (
             <div 
               key={schedule.id}
-              onClick={() => handleLoad(schedule.id, schedule.name, schedule.shifts)}
+              onClick={() => handleLoad(schedule.id, schedule.name, schedule.shifts, schedule.roster)}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; }}
@@ -85,7 +85,7 @@ export function SavedSchedules({ onLoadSchedule }: SavedSchedulesProps) {
               
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); handleLoad(schedule.id, schedule.name, schedule.shifts); }}
+                  onClick={(e) => { e.stopPropagation(); handleLoad(schedule.id, schedule.name, schedule.shifts, schedule.roster); }}
                   style={{ padding: '0.5rem 1rem', backgroundColor: '#ecfdf5', color: '#10b981', border: '1px solid #10b981', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                 >
                   Load

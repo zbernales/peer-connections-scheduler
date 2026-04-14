@@ -4,7 +4,6 @@ import { generateSchedule, timeToFloat, floatToTime } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
 import { RosterDashboard } from './components/RosterDashboard';
 import { SavedSchedules } from './components/SavedSchedules'; 
-// --- NEW: Added updateDoc and doc to imports ---
 import { collection, onSnapshot, addDoc, updateDoc, doc } from 'firebase/firestore'; 
 import { db } from './firebase';
 import { TutorScheduleGrid } from './components/TutorScheduleGrid';
@@ -13,99 +12,63 @@ import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// 1. Upgraded Merger: Now tracks the underlying shift IDs!
 function mergeShiftsForUI(shifts: any[]) {
   if (shifts.length === 0) return [];
-
   const merged = [];
   let currentBlock = { ...shifts[0], shiftIds: [shifts[0].id] };
-
   for (let i = 1; i < shifts.length; i++) {
     const nextShift = shifts[i];
-
-    // Merge ONLY if it's the same day, touches end-to-start, AND is the exact same tutor
-    if (
-      nextShift.day === currentBlock.day && 
-      nextShift.startTime === currentBlock.endTime &&
-      nextShift.tutorId === currentBlock.tutorId 
-    ) {
+    if (nextShift.day === currentBlock.day && nextShift.startTime === currentBlock.endTime && nextShift.tutorId === currentBlock.tutorId) {
       currentBlock.endTime = nextShift.endTime;
-      currentBlock.shiftIds.push(nextShift.id); // Save the ID of the merged shift
+      currentBlock.shiftIds.push(nextShift.id); 
     } else {
       merged.push(currentBlock);
       currentBlock = { ...nextShift, shiftIds: [nextShift.id] };
     }
   }
   merged.push(currentBlock);
-
   return merged;
 }
 
-// 2. NEW HELPER: Checks if a block violates a tutor's availability
 function isOutsideAvailability(tutor: Tutor | undefined, block: any): boolean {
   if (!tutor) return true;
-  
   let current = timeToFloat(block.startTime);
   const end = timeToFloat(block.endTime);
-  
-  // Check every 30-min chunk inside this block
   while (current < end) {
-    const isAvail = tutor.availability.some(avail => 
-      avail.day === block.day &&
-      timeToFloat(avail.startTime) <= current &&
-      timeToFloat(avail.endTime) >= (current + 0.5)
-    );
-    if (!isAvail) return true; // If ANY part of the shift is outside availability, flag it!
+    const isAvail = tutor.availability.some(avail => avail.day === block.day && timeToFloat(avail.startTime) <= current && timeToFloat(avail.endTime) >= (current + 0.5));
+    if (!isAvail) return true; 
     current += 0.5;
   }
   return false;
 }
 
-// Helper specifically for the Subject Matrix
 function getMergedWeeklySchedule(weeklyShifts: any[]) {
   if (weeklyShifts.length === 0) return [];
-
   const groupedByTutor = [...weeklyShifts].sort((a, b) => {
-    if (a.tutorId !== b.tutorId) {
-      return a.tutorId.localeCompare(b.tutorId); 
-    }
-    if (a.day !== b.day) {
-      return DAYS.indexOf(a.day) - DAYS.indexOf(b.day); 
-    }
+    if (a.tutorId !== b.tutorId) return a.tutorId.localeCompare(b.tutorId); 
+    if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day); 
     return timeToFloat(a.startTime) - timeToFloat(b.startTime); 
   });
-
   const mergedBlocks = mergeShiftsForUI(groupedByTutor);
-
   return mergedBlocks.sort((a, b) => {
-    if (a.day !== b.day) {
-      return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
-    }
+    if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
     return timeToFloat(a.startTime) - timeToFloat(b.startTime);
   });
 }
 
-// Helper specifically for the Master Schedule
 function getMergedDailySchedule(dailyShifts: any[]) {
   if (dailyShifts.length === 0) return [];
-
   const groupedByTutor = [...dailyShifts].sort((a, b) => {
-    if (a.tutorId === b.tutorId) {
-      return timeToFloat(a.startTime) - timeToFloat(b.startTime);
-    }
+    if (a.tutorId === b.tutorId) return timeToFloat(a.startTime) - timeToFloat(b.startTime);
     return a.tutorId.localeCompare(b.tutorId);
   });
-
   const mergedBlocks = mergeShiftsForUI(groupedByTutor);
-
   return mergedBlocks.sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime));
 }
 
-// A self-contained modal that manages draft edits before saving to the global schedule
 function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: any) {
   const [draftSlots, setDraftSlots] = useState<Set<string>>(new Set());
 
-  // When the modal opens, convert the global Shift[] into a flat Set of "Day-Time" strings
   useEffect(() => {
     const initialSet = new Set<string>();
     currentSchedule.forEach((shift: Shift) => {
@@ -120,7 +83,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   }, [currentSchedule]);
 
   const handleSave = () => {
-    // Convert the draft Set back into an array of 30-min Shift objects
     const newShifts: Shift[] = Array.from(draftSlots).map(slot => {
       const [day, startTime] = slot.split('-');
       const endTime = floatToTime(timeToFloat(startTime) + 0.5);
@@ -141,12 +103,10 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0 }}>Edit {tutor.name}'s Schedule</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
         </div>
-
         <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>
             <p style={{ margin: '0 0 0.5rem 0' }}><strong>Subjects:</strong> {tutor.subjects.join(', ')}</p>
@@ -158,22 +118,11 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
             </p>
           </div>
         </div>
-
-        <TutorScheduleGrid 
-          tutor={tutor} 
-          selectedSlots={draftSlots} 
-          onChange={setDraftSlots} 
-        />
-
+        <TutorScheduleGrid tutor={tutor} selectedSlots={draftSlots} onChange={setDraftSlots} />
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
-          <button onClick={handleSave} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>
-            Save Changes
-          </button>
-          <button onClick={onClose} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '1rem', cursor: 'pointer' }}>
-            Cancel
-          </button>
+          <button onClick={handleSave} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>
+          <button onClick={onClose} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '1rem', cursor: 'pointer' }}>Cancel</button>
         </div>
-
       </div>
     </div>
   );
@@ -186,25 +135,13 @@ function NavBar() {
   return (
     <nav style={{ backgroundColor: '#1e293b', padding: '1rem', color: 'white', display: 'flex', gap: '1rem', alignItems: 'center', borderRadius: '0 0 8px 8px', marginBottom: '2rem' }}>
       <h2 style={{ margin: 0, marginRight: 'auto', color: 'white' }}>Peer Connections</h2>
-      
-      <Link 
-        to="/submit"
-        style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}
-      >
+      <Link to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Student Submission Page
       </Link>
-      
-      <Link 
-        to="/admin"
-        style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}
-      >
+      <Link to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Roster Dashboard
       </Link>
-      
-      <Link 
-        to="/saved"
-        style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}
-      >
+      <Link to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Saved Schedules
       </Link>
     </nav>
@@ -212,8 +149,11 @@ function NavBar() {
 }
 
 function App() {
-  // --- Global State ---
-  const [roster, setRoster] = useState<Tutor[]>([]);
+  // --- NEW: SPLIT ROSTER STATE ---
+  // globalRoster is the live database. activeRoster is the snapshot for the current schedule.
+  const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
+  const [activeRoster, setActiveRoster] = useState<Tutor[]>([]); 
+
   const [selectedTutorModal, setSelectedTutorModal] = useState<Tutor | null>(null);
   const [hoveredTutorId, setHoveredTutorId] = useState<string | null>(null);
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
@@ -225,56 +165,34 @@ function App() {
     maxHoursPerDay: 6
   });
 
-  // --- Stateful Schedule & Editing ---
   const [schedule, setSchedule] = useState<Shift[]>([]);
-  // NEW: State to remember if we loaded an existing schedule
   const [activeScheduleMeta, setActiveScheduleMeta] = useState<{id: string, name: string} | null>(null);
-  const [editingShiftBlock, setEditingShiftBlock] = useState<any>(null);
 
-  // Set up the real-time listener
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'tutors'), (snapshot) => {
       const tutorsData = snapshot.docs.map(doc => doc.data() as Tutor);
-      setRoster(tutorsData);
+      setGlobalRoster(tutorsData); // Only updates the live DB!
     });
-
     return () => unsubscribe();
   }, []);
   
-  // This function takes a snapshot of the algorithm's output and saves it to state
   const handleGenerateSchedule = () => {
-    const generated = generateSchedule(roster, scheduleConfig);
+    // Generate uses the live DB, and creates a fresh snapshot
+    const generated = generateSchedule(globalRoster, scheduleConfig);
     setSchedule(generated);
+    setActiveRoster(globalRoster); 
     setSelectedTutorModal(null);
-    setActiveScheduleMeta(null); // <-- NEW: Generating a fresh schedule clears the active loaded meta!
+    setActiveScheduleMeta(null); 
   };
 
-  const handleSaveShiftOverride = (newTutorId: string) => {
-    if (!editingShiftBlock) return;
-    
-    const updatedSchedule = schedule.map(shift => {
-      if (editingShiftBlock.shiftIds.includes(shift.id)) {
-        return { ...shift, tutorId: newTutorId };
-      }
-      return shift;
-    });
-
-    setSchedule(updatedSchedule);
-    setEditingShiftBlock(null);
-  };
-
-  // --- Bulk Save Logic for the Tutor Modal ---
   const handleSaveTutorSchedule = (tutorId: string, newTutorShifts: Shift[]) => {
     setSchedule(prevSchedule => {
-      // 1. Strip out ALL existing shifts for this specific tutor
       const filteredSchedule = prevSchedule.filter(s => s.tutorId !== tutorId);
-      // 2. Inject their newly edited shifts
       return [...filteredSchedule, ...newTutorShifts];
     });
-    setSelectedTutorModal(null); // Close the modal
+    setSelectedTutorModal(null); 
   };
 
-  // --- UPDATED: Save Logic (Save vs Save As) ---
   const handleSaveToDatabase = async (saveAsNew: boolean) => {
     if (schedule.length === 0) {
       alert("There is no schedule to save! Generate one first.");
@@ -282,11 +200,11 @@ function App() {
     }
 
     if (!saveAsNew && activeScheduleMeta) {
-      // OVERWRITE EXISTING
       try {
         await updateDoc(doc(db, 'schedules', activeScheduleMeta.id), {
           shifts: schedule,
-          updatedAt: Date.now() // Adds a small timestamp to force Firebase to know it updated
+          roster: activeRoster, // Save the snapshot!
+          updatedAt: Date.now() 
         });
         alert(`"${activeScheduleMeta.name}" has been updated!`);
       } catch (error) {
@@ -294,20 +212,18 @@ function App() {
         alert("Failed to update schedule.");
       }
     } else {
-      // SAVE AS NEW
-      const scheduleName = window.prompt("Enter a name for this schedule (e.g., 'Midterm Week Update'):");
+      const scheduleName = window.prompt("Enter a name for this schedule:");
       if (!scheduleName) return; 
 
       try {
         const docRef = await addDoc(collection(db, 'schedules'), {
           name: scheduleName,
           createdAt: Date.now(),
-          shifts: schedule
+          shifts: schedule,
+          roster: activeRoster // Save the snapshot!
         });
-        
-        // Make this newly saved schedule the active one!
         setActiveScheduleMeta({ id: docRef.id, name: scheduleName });
-        alert(`"${scheduleName}" has been saved`);
+        alert(`"${scheduleName}" has been securely saved to the database!`);
       } catch (error) {
         console.error("Error saving schedule:", error);
         alert("Failed to save schedule.");
@@ -315,8 +231,13 @@ function App() {
     }
   };
 
+  // --- NEW: Find missing tutors to populate the Import Dropdown ---
+  const missingTutors = globalRoster.filter(globalTutor => 
+    !activeRoster.some(activeTutor => activeTutor.id === globalTutor.id)
+  );
+
   const allSubjects = Array.from(
-    new Set(roster.flatMap(tutor => tutor.subjects))
+    new Set(activeRoster.flatMap(tutor => tutor.subjects))
   ).sort();
 
   return (
@@ -336,9 +257,10 @@ function App() {
               </div>
             } />
 
+            {/* Passes the live DB to the generation dashboard */}
             <Route path="/admin" element={
               <RosterDashboard 
-                roster={roster} 
+                roster={globalRoster} 
                 config={scheduleConfig} 
                 onConfigChange={setScheduleConfig}
                 onSelectTutor={setSelectedTutorModal}
@@ -346,21 +268,21 @@ function App() {
               />
             } />
 
-            {/* --- ROUTE 3: SAVED SCHEDULES (/saved) --- */}
             <Route path="/saved" element={
-              <SavedSchedules onLoadSchedule={(id, name, loadedShifts) => {
+              <SavedSchedules onLoadSchedule={(id, name, loadedShifts, loadedRoster) => {
                 setSchedule(loadedShifts);
-                setActiveScheduleMeta({ id, name }); // <-- NEW: Remember what we loaded!
+                // If it's an old save without a roster, fallback to global to prevent crashing
+                setActiveRoster(loadedRoster && loadedRoster.length > 0 ? loadedRoster : globalRoster);
+                setSelectedTutorModal(null);
+                setActiveScheduleMeta({ id, name }); 
               }} />
             } />
 
-            {/* --- ROUTE 2: THE SCHEDULER DASHBOARD (/schedule) --- */}
             <Route path="/schedule" element={
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h1>Master Schedule Dashboard</h1>
                   
-                  {/* --- UPDATED: DYNAMIC SAVE BUTTONS --- */}
                   <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     
                     {activeScheduleMeta ? (
@@ -368,30 +290,35 @@ function App() {
                         <span style={{ fontSize: '0.95rem', color: '#64748b', marginRight: '0.5rem', fontStyle: 'italic' }}>
                           Editing: <strong>{activeScheduleMeta.name}</strong>
                         </span>
-                        <button 
-                          onClick={() => handleSaveToDatabase(false)}
-                          style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)' }}
-                        >
-                          💾 Save Updates
-                        </button>
-                        <button 
-                          onClick={() => handleSaveToDatabase(true)}
-                          style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}
-                        >
-                          📝 Save as New
-                        </button>
+                        <button onClick={() => handleSaveToDatabase(false)} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)' }}>💾 Save Updates</button>
+                        <button onClick={() => handleSaveToDatabase(true)} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>📝 Save as New</button>
                       </>
                     ) : (
-                      <button 
-                        onClick={() => handleSaveToDatabase(true)}
-                        style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}
+                      <button onClick={() => handleSaveToDatabase(true)} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>💾 Save to Database</button>
+                    )}
+
+                    {/* --- NEW: THE IMPORT DROPDOWN --- */}
+                    {missingTutors.length > 0 && (
+                      <select 
+                        value="" 
+                        onChange={(e) => {
+                          const tId = e.target.value;
+                          const tutorToImport = globalRoster.find(x => x.id === tId);
+                          if (tutorToImport) {
+                            setActiveRoster([...activeRoster, tutorToImport]);
+                          }
+                        }}
+                        style={{ padding: '0.5rem', borderRadius: '20px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontWeight: 'bold', color: '#3b82f6', cursor: 'pointer' }}
                       >
-                        💾 Save to Database
-                      </button>
+                        <option value="" disabled>+ Import Missing Tutor</option>
+                        {missingTutors.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
                     )}
 
                     <span style={{ backgroundColor: '#e2e8f0', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 'bold' }}>
-                      Total Tutors: {roster.length}
+                      Total Tutors: {activeRoster.length}
                     </span>
                   </div>
                 </div>
@@ -409,18 +336,15 @@ function App() {
                           <p style={{ color: 'gray', fontStyle: 'italic' }}>No shifts scheduled.</p>
                         ) : (
                         getMergedDailySchedule(daysShifts).map((block, index) => {
-                          const tutor = roster.find(t => t.id === block.tutorId);
+                          // Search the ACTIVE roster first!
+                          const tutor = activeRoster.find(t => t.id === block.tutorId);
                           const tutorName = tutor?.name || 'Unknown';
-                          
-                          // Check for forced overrides!
                           const isForced = isOutsideAvailability(tutor, block);
-                          const bgColor = isForced ? '#fef2f2' : '#f8fafc'; // Light Red vs Light Gray
-                          const borderColor = isForced ? '#ef4444' : '#3b82f6'; // Solid Red vs Solid Blue
+                          const bgColor = isForced ? '#fef2f2' : '#f8fafc'; 
+                          const borderColor = isForced ? '#ef4444' : '#3b82f6'; 
 
                           return (
                             <div key={index} style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: bgColor, borderLeft: `4px solid ${borderColor}`, borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', position: 'relative' }}>
-                          
-
                               <strong>{block.startTime} - {block.endTime}</strong><br />
                               {tutorName} {isForced && <span style={{ color: '#ef4444', fontSize: '0.8em', fontWeight: 'bold' }}><br/>(Outside Availability)</span>}<br />
                               <span style={{ fontSize: '0.85em', color: '#555' }}>{block.subjects.join(', ')}</span>
@@ -437,7 +361,7 @@ function App() {
 
                 <h2>2. Tutor Breakdowns</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                  {roster.map(tutor => {
+                  {activeRoster.map(tutor => {
                     const tutorShifts = schedule.filter(s => s.tutorId === tutor.id);
                     tutorShifts.sort((a, b) => {
                       if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
@@ -453,28 +377,15 @@ function App() {
                         onClick={() => setSelectedTutorModal(tutor)}
                         onMouseEnter={() => setHoveredTutorId(tutor.id)}
                         onMouseLeave={() => setHoveredTutorId(null)}
-                        style={{ 
-                          border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', 
-                          padding: '1.5rem', 
-                          borderRadius: '8px', 
-                          backgroundColor: isHovered ? '#f8fafc' : '#fff', 
-                          cursor: 'pointer', 
-                          transition: 'all 0.2s ease', 
-                          boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)',
-                          transform: isHovered ? 'translateY(-4px)' : 'none',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
+                        style={{ border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#f8fafc' : '#fff', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
                           <span style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
                         </div>
-
                         <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
                           <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
                         </p>
-                        
                         <div style={{ flexGrow: 1 }}>
                           {tutorShifts.length === 0 ? (
                             <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
@@ -488,18 +399,7 @@ function App() {
                             </ul>
                           )}
                         </div>
-
-                        <div style={{ 
-                          marginTop: '1.5rem', 
-                          paddingTop: '1rem', 
-                          borderTop: '1px solid #e2e8f0', 
-                          color: '#3b82f6', 
-                          fontSize: '0.9rem', 
-                          fontWeight: 'bold', 
-                          textAlign: 'center',
-                          opacity: isHovered ? 1 : 0.7,
-                          transition: 'opacity 0.2s'
-                        }}>
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#3b82f6', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s' }}>
                           Click to edit schedule
                         </div>
                       </div>
@@ -521,31 +421,19 @@ function App() {
                         onClick={() => setSelectedSubjectModal(subject)}
                         onMouseEnter={() => setHoveredSubject(subject)}
                         onMouseLeave={() => setHoveredSubject(null)}
-                        style={{ 
-                          border: isHovered ? '2px solid #10b981' : '1px solid #e2e8f0', 
-                          padding: '1.5rem', 
-                          borderRadius: '8px', 
-                          backgroundColor: isHovered ? '#ecfdf5' : '#f8fafc', 
-                          cursor: 'pointer', 
-                          transition: 'all 0.2s ease', 
-                          boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none',
-                          transform: isHovered ? 'translateY(-4px)' : 'none',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
+                        style={{ border: isHovered ? '2px solid #10b981' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#ecfdf5' : '#f8fafc', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <h3 style={{ marginTop: 0, color: '#0f172a' }}>📚 {subject}</h3>
                           <span style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
                         </div>
-
                         <div style={{ flexGrow: 1, marginTop: '1rem' }}>
                           {subjectShifts.length === 0 ? (
-                            <p style={{ color: '#ef4444', fontWeight: 'bold', margin: 0 }}>⚠️ No coverage</p>
+                            <p style={{ color: '#ef4444', fontWeight: 'bold', margin: 0 }}>⚠️ No coverage this week!</p>
                           ) : (
                             <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569' }}>
                               {getMergedWeeklySchedule(subjectShifts).map((block, index) => {
-                                const tutorName = roster.find(t => t.id === block.tutorId)?.name || 'Unknown';
+                                const tutorName = activeRoster.find(t => t.id === block.tutorId)?.name || 'Unknown';
                                 return (
                                   <li key={index} style={{ marginBottom: '0.25rem' }}>
                                     <strong>{block.day}: {block.startTime} - {block.endTime}</strong> <span style={{ color: '#3b82f6' }}>({tutorName})</span>
@@ -555,18 +443,7 @@ function App() {
                             </ul>
                           )}
                         </div>
-
-                        <div style={{ 
-                          marginTop: '1.5rem', 
-                          paddingTop: '1rem', 
-                          borderTop: '1px solid #e2e8f0', 
-                          color: '#10b981', 
-                          fontSize: '0.9rem', 
-                          fontWeight: 'bold', 
-                          textAlign: 'center',
-                          opacity: isHovered ? 1 : 0.7,
-                          transition: 'opacity 0.2s'
-                        }}>
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#10b981', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s' }}>
                           Click to view coverage map
                         </div>
                       </div>
@@ -574,7 +451,6 @@ function App() {
                   })}
                 </div>
 
-                {/* --- TUTOR DETAILS MODAL --- */}
                 {selectedTutorModal && (
                   <TutorScheduleEditorModal 
                     tutor={selectedTutorModal}
@@ -584,98 +460,18 @@ function App() {
                   />
                 )}
 
-                {/* --- SUBJECT DETAILS MODAL --- */}
                 {selectedSubjectModal && (
-                  <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
-                  }}>
-                    <div style={{
-                      backgroundColor: 'white', padding: '2rem', borderRadius: '8px',
-                      maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
-                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-                    }}>
+                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                    <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                         <h2 style={{ margin: 0 }}>📚 {selectedSubjectModal} Coverage</h2>
-                        <button 
-                          onClick={() => setSelectedSubjectModal(null)}
-                          style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}
-                        >
-                          &times;
-                        </button>
+                        <button onClick={() => setSelectedSubjectModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
                       </div>
-
-                      <SubjectScheduleGrid 
-                        subject={selectedSubjectModal} 
-                        shifts={schedule.filter(s => s.subjects.includes(selectedSubjectModal))} 
-                        roster={roster}
-                      />
-
+                      <SubjectScheduleGrid subject={selectedSubjectModal} shifts={schedule.filter(s => s.subjects.includes(selectedSubjectModal))} roster={activeRoster} />
                     </div>
                   </div>
                 )}
 
-                {/* --- EDIT SHIFT MODAL --- */}
-                {editingShiftBlock && (
-                  <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
-                  }}>
-                    <div style={{
-                      backgroundColor: 'white', padding: '2rem', borderRadius: '8px',
-                      maxWidth: '400px', width: '100%',
-                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-                    }}>
-                      <h3 style={{ marginTop: 0, borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Manually Reassign Shift</h3>
-                      
-                      <p><strong>Time:</strong> {editingShiftBlock.day} {editingShiftBlock.startTime} - {editingShiftBlock.endTime}</p>
-                      <p><strong>Subjects:</strong> {editingShiftBlock.subjects.join(', ')}</p>
-                      
-                      <label style={{ display: 'block', marginTop: '1.5rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Select New Tutor:</label>
-                      <select 
-                        id="tutor-override-select"
-                        defaultValue={editingShiftBlock.tutorId}
-                        style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', marginBottom: '2rem' }}
-                      >
-                        {roster.map(t => {
-                          const isAvail = !isOutsideAvailability(t, editingShiftBlock);
-                          const canTeach = editingShiftBlock.subjects.some((sub: string) => t.subjects.includes(sub));
-                          
-                          // Build a warning string if they aren't a perfect fit
-                          let warning = "";
-                          if (!isAvail) warning += " (Not Available)";
-                          if (!canTeach) warning += " (Wrong Subject)";
-
-                          return (
-                            <option key={t.id} value={t.id}>
-                              {t.name} {warning}
-                            </option>
-                          )
-                        })}
-                      </select>
-
-                      <div style={{ display: 'flex', gap: '1rem' }}>
-                        <button 
-                          onClick={() => {
-                            const selectEl = document.getElementById('tutor-override-select') as HTMLSelectElement;
-                            handleSaveShiftOverride(selectEl.value);
-                          }}
-                          style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                          Confirm Override
-                        </button>
-                        <button 
-                          onClick={() => setEditingShiftBlock(null)}
-                          style={{ padding: '0.75rem', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </>
             } />
 

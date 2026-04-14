@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { generateSchedule, timeToFloat, floatToTime, format12Hour } from './utils/scheduler';
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { generateSchedule, timeToFloat, floatToTime } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
 import { RosterDashboard } from './components/RosterDashboard';
 import { SavedSchedules } from './components/SavedSchedules'; 
@@ -11,6 +11,9 @@ import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
 import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+// --- HARDCODED ADMIN PIN ---
+const ADMIN_PIN = 'SJSU2026';
 
 const DEPARTMENT_NAMES: Record<string, string> = {
   AE: 'Aerospace Engineering',
@@ -64,6 +67,14 @@ const DEPARTMENT_NAMES: Record<string, string> = {
   Undergraduate: 'Undergraduate Writing' 
 };
 
+function format12Hour(time24: string): string {
+  const [h, m] = time24.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const hr12 = h % 12 || 12;
+  const minStr = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`;
+  return `${hr12}${minStr}${ampm}`;
+}
+
 function mergeShiftsForUI(shifts: any[]) {
   if (shifts.length === 0) return [];
   const merged = [];
@@ -116,6 +127,45 @@ function getMergedDailySchedule(dailyShifts: any[]) {
   });
   const mergedBlocks = mergeShiftsForUI(groupedByTutor);
   return mergedBlocks.sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime));
+}
+
+// --- NEW: Security Guard Wrapper for Admin Routes ---
+function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: React.ReactNode }) {
+  if (!isAdmin) {
+    // If a student tries to type /admin in the URL, kick them to the submit page!
+    return <Navigate to="/submit" replace />;
+  }
+  return <>{children}</>;
+}
+
+// --- NEW: Login Screen Component ---
+function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
+  const [pin, setPin] = useState('');
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onLogin(pin);
+  };
+
+  return (
+    <div style={{ maxWidth: '400px', margin: '4rem auto', padding: '2rem', border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: 'white', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+      <h2 style={{ marginTop: 0, textAlign: 'center', color: '#1e293b' }}>Admin Access</h2>
+      <p style={{ textAlign: 'center', color: '#64748b', marginBottom: '1.5rem' }}>Enter the staff PIN to access the scheduling dashboard.</p>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <input 
+          type="password" 
+          value={pin} 
+          onChange={(e) => setPin(e.target.value)} 
+          placeholder="Enter PIN" 
+          autoFocus
+          style={{ padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '1.1rem', textAlign: 'center', letterSpacing: '0.2rem' }} 
+        />
+        <button type="submit" style={{ padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' }}>
+          Unlock Dashboard
+        </button>
+      </form>
+    </div>
+  );
 }
 
 function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHoveredSubject, setSelectedSubjectModal }: any) {
@@ -236,8 +286,8 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   );
 }
 
-// --- UPDATED: Added onDiscardChanges prop so we can clear the ghost schedule! ---
-function NavBar({ hasUnsavedChanges, onDiscardChanges }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void }) {
+// --- UPDATED: NavBar conditionally renders links based on isAdmin ---
+function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void, isAdmin: boolean, onLogout: () => void }) {
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -247,7 +297,6 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges }: { hasUnsavedChanges: bo
       if (!confirmLeave) {
         e.preventDefault(); 
       } else {
-        // User agreed to leave, so we wipe out the ghost schedule!
         onDiscardChanges();
       }
     }
@@ -256,20 +305,60 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges }: { hasUnsavedChanges: bo
   return (
     <nav style={{ backgroundColor: '#1e293b', padding: '1rem', color: 'white', display: 'flex', gap: '1rem', alignItems: 'center', borderRadius: '0 0 8px 8px', marginBottom: '2rem' }}>
       <h2 style={{ margin: 0, marginRight: 'auto', color: 'white' }}>Peer Connections</h2>
+      
+      {/* Student Link - Always visible */}
       <Link onClick={handleNavClick} to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-        Student Submission Page
+        Tutor Submission Form
       </Link>
-      <Link onClick={handleNavClick} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-        Roster Dashboard
-      </Link>
-      <Link onClick={handleNavClick} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-        Saved Schedules
-      </Link>
+      
+      {/* Admin Links - Only visible if logged in */}
+      {isAdmin ? (
+        <>
+          <Link onClick={handleNavClick} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+            Roster Dashboard
+          </Link>
+          <Link onClick={handleNavClick} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+            Saved Schedules
+          </Link>
+          <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Lock App
+          </button>
+        </>
+      ) : (
+        // Login Link - Visible to public (subtle styling so students ignore it)
+        <Link to="/login" style={{ textDecoration: 'none', padding: '0.5rem 1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+          Admin Login
+        </Link>
+      )}
     </nav>
   );
 }
 
 function App() {
+  // --- NEW: Authentication State ---
+  // Checks localStorage on initial load so they stay logged in when refreshing
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return localStorage.getItem('peerConnectionsAdmin') === 'true';
+  });
+
+  const navigate = useNavigate();
+
+  const handleLogin = (pin: string) => {
+    if (pin === ADMIN_PIN) {
+      localStorage.setItem('peerConnectionsAdmin', 'true');
+      setIsAdmin(true);
+      navigate('/admin'); // Redirect to dashboard on success
+    } else {
+      alert('Incorrect PIN.');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('peerConnectionsAdmin');
+    setIsAdmin(false);
+    navigate('/submit'); // Kick back to student form
+  };
+
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
   const [activeRoster, setActiveRoster] = useState<Tutor[]>([]); 
 
@@ -295,7 +384,6 @@ function App() {
 
   const hasUnsavedChanges = schedule.length > 0 && activeScheduleMeta === null;
 
-  // --- NEW: The cleanup function that throws away the ghost schedule ---
   const handleDiscardUnsavedChanges = () => {
     setSchedule([]);
     setActiveRoster([]);
@@ -362,7 +450,7 @@ function App() {
 
   const handleSaveAsNew = async () => {
     if (schedule.length === 0) {
-      alert("There is no schedule to save. Generate one first.");
+      alert("There is no schedule to save! Generate one first.");
       return;
     }
 
@@ -377,7 +465,7 @@ function App() {
         roster: activeRoster 
       });
       setActiveScheduleMeta({ id: docRef.id, name: scheduleName });
-      alert(`"${scheduleName}" has been saved`);
+      alert(`"${scheduleName}" has been securely saved to the database!`);
     } catch (error) {
       console.error("Error saving schedule:", error);
       alert("Failed to save schedule.");
@@ -428,24 +516,30 @@ function App() {
   );
 
   return (
-    <BrowserRouter>
-      <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
-        
-        {/* UPDATED: Pass the discard function down to the NavBar */}
-        <NavBar hasUnsavedChanges={hasUnsavedChanges} onDiscardChanges={handleDiscardUnsavedChanges} />
+    <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
+      
+      {/* Pass auth props down to NavBar */}
+      <NavBar hasUnsavedChanges={hasUnsavedChanges} onDiscardChanges={handleDiscardUnsavedChanges} isAdmin={isAdmin} onLogout={handleLogout} />
 
-        <div style={{ padding: '0 2rem 2rem 2rem' }}>
-          <Routes>
-            
-            <Route path="/submit" element={
-              <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-                <TutorForm onSubmit={(newTutor) => {
-                  alert(`${newTutor.name}'s availability has been submitted.`);
-                }} />
-              </div>
-            } />
+      <div style={{ padding: '0 2rem 2rem 2rem' }}>
+        <Routes>
+          
+          <Route path="/submit" element={
+            <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+              <TutorForm onSubmit={(newTutor) => {
+                alert(`${newTutor.name}'s availability has been submitted.`);
+              }} />
+            </div>
+          } />
 
-            <Route path="/admin" element={
+          {/* --- NEW: The Login Route --- */}
+          <Route path="/login" element={
+            isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />
+          } />
+
+          {/* --- UPDATED: Admin Routes wrapped in ProtectedRoute --- */}
+          <Route path="/admin" element={
+            <ProtectedRoute isAdmin={isAdmin}>
               <RosterDashboard 
                 roster={globalRoster} 
                 config={scheduleConfig} 
@@ -453,18 +547,22 @@ function App() {
                 onSelectTutor={setSelectedTutorModal}
                 onGenerate={handleGenerateSchedule} 
               />
-            } />
+            </ProtectedRoute>
+          } />
 
-            <Route path="/saved" element={
+          <Route path="/saved" element={
+            <ProtectedRoute isAdmin={isAdmin}>
               <SavedSchedules onLoadSchedule={(id, name, loadedShifts, loadedRoster) => {
                 setSchedule(loadedShifts);
                 setActiveRoster(loadedRoster && loadedRoster.length > 0 ? loadedRoster : globalRoster);
                 setSelectedTutorModal(null);
                 setActiveScheduleMeta({ id, name }); 
               }} />
-            } />
+            </ProtectedRoute>
+          } />
 
-            <Route path="/schedule" element={
+          <Route path="/schedule" element={
+            <ProtectedRoute isAdmin={isAdmin}>
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h1>Master Schedule Dashboard</h1>
@@ -481,7 +579,7 @@ function App() {
                         <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>📝 Save as New</button>
                       </>
                     ) : (
-                      <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>💾 Save Schedule</button>
+                      <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>💾 Save to Database</button>
                     )}
 
                     {missingTutors.length > 0 && (
@@ -721,15 +819,21 @@ function App() {
                 )}
 
               </>
-            } />
+            </ProtectedRoute>
+          } />
 
-            <Route path="*" element={<Navigate to="/submit" replace />} />
+          <Route path="*" element={<Navigate to="/submit" replace />} />
 
-          </Routes>
-        </div>
+        </Routes>
       </div>
-    </BrowserRouter>
+    </div>
   );
 }
 
-export default App;
+export default function AppEntry() {
+  return (
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  );
+}

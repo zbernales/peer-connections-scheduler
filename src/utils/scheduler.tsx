@@ -4,7 +4,6 @@ const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday
 const START_HOUR = 9;  // 9.0 = 9:00 AM
 const END_HOUR = 19;   // 19.0 = 7:00 PM
 
-// --- TIME HELPERS ---
 export function timeToFloat(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours + (minutes / 60);

@@ -12,7 +12,6 @@ import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// --- HARDCODED ADMIN PIN ---
 const ADMIN_PIN = 'SJSU2026';
 
 const DEPARTMENT_NAMES: Record<string, string> = {
@@ -107,16 +106,15 @@ function getMergedWeeklySchedule(weeklyShifts: any[]) {
   });
 }
 
-// --- NEW: Security Guard Wrapper for Admin Routes ---
+// --- Security Guard Wrapper for Admin Routes ---
 function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: React.ReactNode }) {
   if (!isAdmin) {
-    // If a student tries to type /admin in the URL, kick them to the submit page!
     return <Navigate to="/submit" replace />;
   }
   return <>{children}</>;
 }
 
-// --- NEW: Login Screen Component ---
+// --- Login Screen ---
 function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
   const [pin, setPin] = useState('');
   
@@ -264,7 +262,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   );
 }
 
-// --- UPDATED: NavBar conditionally renders links based on isAdmin ---
 function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void, isAdmin: boolean, onLogout: () => void }) {
   const location = useLocation();
   const currentPath = location.pathname;
@@ -313,8 +310,6 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
 }
 
 function App() {
-  // --- NEW: Authentication State ---
-  // Checks localStorage on initial load so they stay logged in when refreshing
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return localStorage.getItem('peerConnectionsAdmin') === 'true';
   });
@@ -325,7 +320,7 @@ function App() {
     if (pin === ADMIN_PIN) {
       localStorage.setItem('peerConnectionsAdmin', 'true');
       setIsAdmin(true);
-      navigate('/admin'); // Redirect to dashboard on success
+      navigate('/admin'); 
     } else {
       alert('Incorrect PIN.');
     }
@@ -334,7 +329,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('peerConnectionsAdmin');
     setIsAdmin(false);
-    navigate('/submit'); // Kick back to student form
+    navigate('/submit'); 
   };
 
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
@@ -495,8 +490,7 @@ function App() {
 
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
-      
-      {/* Pass auth props down to NavBar */}
+    
       <NavBar hasUnsavedChanges={hasUnsavedChanges} onDiscardChanges={handleDiscardUnsavedChanges} isAdmin={isAdmin} onLogout={handleLogout} />
 
       <div style={{ padding: '0 2rem 2rem 2rem' }}>
@@ -510,7 +504,6 @@ function App() {
             </div>
           } />
 
-          {/* --- NEW: The Login Route --- */}
           <Route path="/login" element={
             isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />
           } />

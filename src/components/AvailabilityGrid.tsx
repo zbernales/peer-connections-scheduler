@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { DayOfWeek } from '../types';
-import { floatToTime, format12Hour } from '../utils/scheduler';
+import { format12Hour } from '../utils/scheduler';
 
 interface AvailabilityGridProps {
   selectedSlots: Set<string>;

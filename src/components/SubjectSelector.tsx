@@ -18,11 +18,11 @@ const AVAILABLE_COURSES = [
   'BIOL 10', 'BIOL 21', 'BIOL 30', 'BIOL 31', 'BIOL 54', 'BIOL 65', 'BIOL 66', 'BIOL 115', 'BIOL 124', 'BIOL 155', 'BIOL 167', 'MICR 20', 'MICR 101',
   
   // Business (BUS1 - BUS5)
-  'BUS1-20', 'BUS1-21', 'BUS1-120A', 'BUS1-120B', 'BUS1-121A', 'BUS1-121B', 'BUS1-122A', 'BUS1-123A', 'BUS1-123C', 'BUS1-124', 'BUS1-127A', 'BUS1-129A', 'BUS1-170', 'BUS1-172A', 'BUS1-173A', 'BUS1-173B',
-  'BUS2-90', 'BUS2-130', 'BUS2-190', 'BUS2-194A', 'BUS2-194B', 'BUS2-195A', 'BUS2-195B',
-  'BUS3-10', 'BUS3-12', 'BUS3-80', 'BUS3-150', 'BUS3-160', 'BUS3-161A', 'BUS3-161B', 'BUS3-186',
-  'BUS4-91L', 'BUS4-92', 'BUS4-188',
-  'BUS5-140', 'BUS5-187',
+  'BUS1 20', 'BUS1 21', 'BUS1 120A', 'BUS1 120B', 'BUS1 121A', 'BUS1 121B', 'BUS1 122A', 'BUS1 123A', 'BUS1 123C', 'BUS1 124', 'BUS1 127A', 'BUS1 129A', 'BUS1 170', 'BUS1 172A', 'BUS1 173A', 'BUS1 173B',
+  'BUS2 90', 'BUS2 130', 'BUS2 190', 'BUS2 194A', 'BUS2 194B', 'BUS2 195A', 'BUS2 195B',
+  'BUS3 10', 'BUS3 12', 'BUS3 80', 'BUS3 150', 'BUS3 160', 'BUS3 161A', 'BUS3 161B', 'BUS3 186',
+  'BUS4 91L', 'BUS4 92', 'BUS4 188',
+  'BUS5 140', 'BUS5 187',
   
   // Chemical & Chemistry
   'CHE 110B', 'CHE 115', 'CHE 162', 'CHE 190',
@@ -114,6 +114,21 @@ export function SubjectSelector({ selectedSubjects, onChange }: SubjectSelectorP
     onChange(selectedSubjects.filter(c => c !== courseToRemove));
   };
 
+  // --- NEW: Handle Enter Key for Custom Courses ---
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Stop the form from submitting!
+      
+      const customCourse = searchTerm.trim().toUpperCase();
+      
+      if (customCourse && !selectedSubjects.includes(customCourse)) {
+        addSubject(customCourse);
+      } else if (selectedSubjects.includes(customCourse)) {
+        setSearchTerm(''); // Clear the input if they try to add a duplicate
+      }
+    }
+  };
+
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
       
@@ -171,7 +186,8 @@ export function SubjectSelector({ selectedSubjects, onChange }: SubjectSelectorP
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder={selectedSubjects.length === 0 ? "Search for courses..." : ""}
+          onKeyDown={handleKeyDown} // <-- NEW: Added the Enter key handler!
+          placeholder={selectedSubjects.length === 0 ? "Search courses or type a custom one and press Enter (e.g., CS 46B or BUS1 120A)" : ""}
           style={{ 
             border: 'none', 
             outline: 'none', 

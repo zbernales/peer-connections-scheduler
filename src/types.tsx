@@ -29,4 +29,5 @@ export interface ScheduleConfig {
   maxConsecutiveHours: number;
   minCooldownHours: number;
   maxHoursPerDay: number;
+  minHoursPerShift: number;
 }

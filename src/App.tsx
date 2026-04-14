@@ -159,10 +159,11 @@ function App() {
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
-    tutorsPerHour: 2,
+    tutorsPerHour: 8,
     maxConsecutiveHours: 4,
     minCooldownHours: 1,
-    maxHoursPerDay: 6
+    maxHoursPerDay: 6,
+    minHoursPerShift: 1
   });
 
   const [schedule, setSchedule] = useState<Shift[]>([]);
@@ -231,6 +232,18 @@ function App() {
     }
   };
 
+  // --- NEW: Remove Tutor from Active Schedule Snapshot ---
+  const handleRemoveTutorFromSchedule = (tutorId: string, tutorName: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevents the card's onClick from firing and opening the edit modal!
+    
+    if (window.confirm(`Are you sure you want to remove ${tutorName} from this schedule? This will also delete all of their assigned shifts.`)) {
+      // 1. Remove them from the active roster snapshot
+      setActiveRoster(prev => prev.filter(t => t.id !== tutorId));
+      
+      // 2. Strip all of their shifts out of the current schedule
+      setSchedule(prev => prev.filter(s => s.tutorId !== tutorId));
+    }
+  };
   // --- NEW: Find missing tutors to populate the Import Dropdown ---
   const missingTutors = globalRoster.filter(globalTutor => 
     !activeRoster.some(activeTutor => activeTutor.id === globalTutor.id)
@@ -381,7 +394,28 @@ function App() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
-                          <span style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
+                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                            {/* --- NEW: TRASH CAN BUTTON --- */}
+                            <button
+                              onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
+                              style={{ 
+                                background: 'none', 
+                                border: 'none', 
+                                color: '#ef4444', 
+                                cursor: 'pointer', 
+                                fontSize: '1.1rem',
+                                opacity: isHovered ? 0.7 : 0, // Only shows when hovering over the card
+                                transition: 'opacity 0.2s',
+                                padding: 0
+                              }}
+                              title="Remove from Schedule"
+                              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                            >
+                              🗑️
+                            </button>
+                            <span style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
+                          </div>
                         </div>
                         <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
                           <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)

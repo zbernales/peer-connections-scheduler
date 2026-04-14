@@ -33,6 +33,14 @@ function isAlreadyWorking(tutorId: string, day: DayOfWeek, timeSlot: number, cur
            timeToFloat(shift.startTime) === timeSlot;
   });
 }
+// Converts "13:30" to "1:30pm" and "09:00" to "9am"
+export function format12Hour(time24: string): string {
+  const [h, m] = time24.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const hr12 = h % 12 || 12;
+  const minStr = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`;
+  return `${hr12}${minStr}${ampm}`;
+}
 
 // --- THE SCHEDULER ---
 export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift[] {
@@ -163,6 +171,8 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       });
     }
   }
+
+  
 
   return schedule;
 }

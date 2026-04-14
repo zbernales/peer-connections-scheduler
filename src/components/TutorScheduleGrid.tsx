@@ -1,12 +1,11 @@
-// src/components/TutorScheduleGrid.tsx
 import { useState, useEffect } from 'react';
 import type { Tutor, DayOfWeek } from '../types';
-import { timeToFloat, floatToTime } from '../utils/scheduler';
+import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
 interface TutorScheduleGridProps {
   tutor: Tutor;
-  selectedSlots: Set<string>; // NEW: We now pass a flat Set of "Day-Time" strings
-  onChange: (newSlots: Set<string>) => void; // NEW: Callback for draft changes
+  selectedSlots: Set<string>; 
+  onChange: (newSlots: Set<string>) => void; 
 }
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -32,11 +31,9 @@ function buildSlotSet(items: { day: string; startTime: string; endTime: string }
 export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
-  // Drag and Drop State
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
 
-  // Stop dragging if the mouse leaves the browser window or user lets go of the button
   useEffect(() => {
     const handleMouseUp = () => setIsDragging(false);
     window.addEventListener('mouseup', handleMouseUp);
@@ -69,7 +66,6 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorSched
   return (
     <div style={{ overflowX: 'auto', paddingBottom: '1rem', userSelect: 'none' }}>
       
-      {/* Legend */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{ width: '16px', height: '16px', backgroundColor: '#3b82f6', borderRadius: '4px' }}></div>
@@ -89,10 +85,9 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorSched
         </div>
       </div>
 
-      {/* Grid */}
       <div 
         style={{ display: 'grid', gridTemplateColumns: `60px repeat(${DAYS.length}, 1fr)`, gap: '4px', minWidth: '600px' }}
-        onMouseLeave={() => setIsDragging(false)} // Safety catch
+        onMouseLeave={() => setIsDragging(false)} 
       >
         <div></div> 
         {DAYS.map(day => (
@@ -103,8 +98,10 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorSched
 
         {TIMES.map(time => (
           <div style={{ display: 'contents' }} key={time}>
-            <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-              {time}
+            
+            {/* --- UPDATED: Only show the label if it is the top of the hour! --- */}
+            <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingTop: '4px' }}>
+              {time.endsWith(':00') ? format12Hour(time) : ''}
             </div>
 
             {DAYS.map(day => {
@@ -112,7 +109,6 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorSched
               const isScheduled = selectedSlots.has(cellId);
               const isAvailable = availableSlots.has(cellId);
 
-              // Determine exact cell color
               let bgColor = '#f1f5f9'; 
               if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
               else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 

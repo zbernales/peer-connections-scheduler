@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { generateSchedule, timeToFloat, floatToTime } from './utils/scheduler';
+import { generateSchedule, timeToFloat, floatToTime, format12Hour } from './utils/scheduler';
 import { TutorForm } from './components/TutorForm';
 import { RosterDashboard } from './components/RosterDashboard';
 import { SavedSchedules } from './components/SavedSchedules'; 
@@ -12,14 +12,57 @@ import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// --- NEW HELPER: Converts "13:30" to "1:30pm" and "09:00" to "9am" ---
-function format12Hour(time24: string): string {
-  const [h, m] = time24.split(':').map(Number);
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const hr12 = h % 12 || 12;
-  const minStr = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`;
-  return `${hr12}${minStr}${ampm}`;
-}
+const DEPARTMENT_NAMES: Record<string, string> = {
+  AE: 'Aerospace Engineering',
+  AMS: 'American Studies',
+  ANTH: 'Anthropology',
+  BIOL: 'Biological Sciences',
+  MICR: 'Microbiology',
+  BUS1: 'Business',
+  BUS2: 'Business',
+  BUS3: 'Business',
+  BUS4: 'Business',
+  BUS5: 'Business',
+  CHE: 'Chemical Engineering',
+  CHEM: 'Chemistry',
+  CHAD: 'Child Development',
+  CE: 'Civil Engineering',
+  COMM: 'Communication',
+  ECON: 'Economics',
+  CMPE: 'Computer Engineering',
+  CS: 'Computer Science',
+  ISDA: 'Data Science',
+  EE: 'Electrical Engineering',
+  ENGR: 'General Engineering',
+  TECH: 'Engineering Technology',
+  ENGL: 'English',
+  HUM: 'Humanities',
+  HIST: 'History',
+  PHIL: 'Philosophy',
+  DSGD: 'Design',
+  DSID: 'Design',
+  KIN: 'Kinesiology',
+  GEOL: 'Geology',
+  METR: 'Meteorology',
+  MATE: 'Materials Engineering',
+  ISE: 'Industrial & Systems Engineering',
+  ME: 'Mechanical Engineering',
+  MATH: 'Mathematics',
+  STAT: 'Statistics',
+  UNVS: 'University Studies',
+  NUFS: 'Nutrition & Food Science',
+  PH: 'Public Health',
+  PHYS: 'Physics',
+  POLS: 'Political Science',
+  PSYC: 'Psychology',
+  SOCI: 'Sociology',
+  LING: 'Linguistics',
+  CHIN: 'Chinese',
+  FREN: 'French',
+  JPN: 'Japanese',
+  VIET: 'Vietnamese',
+  Undergraduate: 'Undergraduate Writing' 
+};
 
 function mergeShiftsForUI(shifts: any[]) {
   if (shifts.length === 0) return [];
@@ -75,7 +118,6 @@ function getMergedDailySchedule(dailyShifts: any[]) {
   return mergedBlocks.sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime));
 }
 
-// --- UPDATED: Subject Card now groups by Day and uses 12-hour AM/PM format ---
 function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHoveredSubject, setSelectedSubjectModal }: any) {
   const subjectShifts = schedule.filter((s: any) => s.subjects.includes(subject));
   const isHovered = hoveredSubject === subject;
@@ -83,14 +125,18 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
 
   return (
     <div 
-      onClick={() => setSelectedSubjectModal(subject)}
       onMouseEnter={() => setHoveredSubject(subject)}
       onMouseLeave={() => setHoveredSubject(null)}
-      style={{ border: isHovered ? '2px solid #10b981' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#ecfdf5' : '#f8fafc', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
+      style={{ border: isHovered ? '2px solid #10b981' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#ecfdf5' : '#f8fafc', cursor: 'default', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <h3 style={{ marginTop: 0, color: '#0f172a' }}>📚 {subject}</h3>
-        <span style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
+        <span 
+          onClick={() => setSelectedSubjectModal(subject)}
+          style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
+        >
+          ↗
+        </span>
       </div>
       <div style={{ flexGrow: 1, marginTop: '1rem' }}>
         {subjectShifts.length === 0 ? (
@@ -118,7 +164,10 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
           </div>
         )}
       </div>
-      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#10b981', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s' }}>
+      <div 
+        onClick={() => setSelectedSubjectModal(subject)}
+        style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#10b981', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s', cursor: 'pointer' }}
+      >
         Click to view coverage map
       </div>
     </div>
@@ -187,20 +236,33 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   );
 }
 
-function NavBar() {
+// --- UPDATED: Added onDiscardChanges prop so we can clear the ghost schedule! ---
+function NavBar({ hasUnsavedChanges, onDiscardChanges }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void }) {
   const location = useLocation();
   const currentPath = location.pathname;
+
+  const handleNavClick = (e: React.MouseEvent) => {
+    if (hasUnsavedChanges) {
+      const confirmLeave = window.confirm("You have a generated schedule that hasn't been saved! If you leave this page, your schedule will be lost. Are you sure you want to leave?");
+      if (!confirmLeave) {
+        e.preventDefault(); 
+      } else {
+        // User agreed to leave, so we wipe out the ghost schedule!
+        onDiscardChanges();
+      }
+    }
+  };
 
   return (
     <nav style={{ backgroundColor: '#1e293b', padding: '1rem', color: 'white', display: 'flex', gap: '1rem', alignItems: 'center', borderRadius: '0 0 8px 8px', marginBottom: '2rem' }}>
       <h2 style={{ margin: 0, marginRight: 'auto', color: 'white' }}>Peer Connections</h2>
-      <Link to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+      <Link onClick={handleNavClick} to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Student Submission Page
       </Link>
-      <Link to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+      <Link onClick={handleNavClick} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Roster Dashboard
       </Link>
-      <Link to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+      <Link onClick={handleNavClick} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Saved Schedules
       </Link>
     </nav>
@@ -227,8 +289,30 @@ function App() {
   const [activeScheduleMeta, setActiveScheduleMeta] = useState<{id: string, name: string} | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
+  const [tutorSearchQuery, setTutorSearchQuery] = useState(''); 
   const [subjectSearchQuery, setSubjectSearchQuery] = useState('');
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+
+  const hasUnsavedChanges = schedule.length > 0 && activeScheduleMeta === null;
+
+  // --- NEW: The cleanup function that throws away the ghost schedule ---
+  const handleDiscardUnsavedChanges = () => {
+    setSchedule([]);
+    setActiveRoster([]);
+    setActiveScheduleMeta(null);
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; 
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'tutors'), (snapshot) => {
@@ -278,7 +362,7 @@ function App() {
 
   const handleSaveAsNew = async () => {
     if (schedule.length === 0) {
-      alert("There is no schedule to save! Generate one first.");
+      alert("There is no schedule to save. Generate one first.");
       return;
     }
 
@@ -293,7 +377,7 @@ function App() {
         roster: activeRoster 
       });
       setActiveScheduleMeta({ id: docRef.id, name: scheduleName });
-      alert(`"${scheduleName}" has been securely saved to the database!`);
+      alert(`"${scheduleName}" has been saved`);
     } catch (error) {
       console.error("Error saving schedule:", error);
       alert("Failed to save schedule.");
@@ -327,9 +411,11 @@ function App() {
   };
 
   const subjectsByDept = allSubjects.reduce((acc, subject) => {
-    const dept = subject.split(' ')[0]; 
-    if (!acc[dept]) acc[dept] = [];
-    acc[dept].push(subject);
+    const prefix = subject.split(' ')[0]; 
+    const deptName = DEPARTMENT_NAMES[prefix] || prefix; 
+    
+    if (!acc[deptName]) acc[deptName] = [];
+    acc[deptName].push(subject);
     return acc;
   }, {} as Record<string, string[]>);
 
@@ -337,11 +423,16 @@ function App() {
     sub.toLowerCase().includes(subjectSearchQuery.toLowerCase())
   );
 
+  const filteredTutors = activeRoster.filter(tutor => 
+    tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase())
+  );
+
   return (
     <BrowserRouter>
       <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
         
-        <NavBar />
+        {/* UPDATED: Pass the discard function down to the NavBar */}
+        <NavBar hasUnsavedChanges={hasUnsavedChanges} onDiscardChanges={handleDiscardUnsavedChanges} />
 
         <div style={{ padding: '0 2rem 2rem 2rem' }}>
           <Routes>
@@ -386,10 +477,11 @@ function App() {
                           Editing: <strong>{activeScheduleMeta.name}</strong> 
                           {saveStatus && <span style={{ marginLeft: '6px', color: saveStatus === 'Error saving' ? '#ef4444' : '#10b981' }}>({saveStatus})</span>}
                         </span>
+                        
                         <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>📝 Save as New</button>
                       </>
                     ) : (
-                      <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>💾 Save to Database</button>
+                      <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>💾 Save Schedule</button>
                     )}
 
                     {missingTutors.length > 0 && (
@@ -453,74 +545,96 @@ function App() {
                 <hr style={{ margin: '3rem 0' }} />
 
                 <h2>2. Tutor Breakdowns</h2>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <input 
+                    type="text" 
+                    placeholder="🔍 Search for a specific tutor..." 
+                    value={tutorSearchQuery}
+                    onChange={(e) => setTutorSearchQuery(e.target.value)}
+                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                  />
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-                  {activeRoster.map(tutor => {
-                    const tutorShifts = schedule.filter(s => s.tutorId === tutor.id);
-                    tutorShifts.sort((a, b) => {
-                      if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
-                      return timeToFloat(a.startTime) - timeToFloat(b.startTime);
-                    });
+                  {filteredTutors.length > 0 ? (
+                    filteredTutors.map(tutor => {
+                      const tutorShifts = schedule.filter(s => s.tutorId === tutor.id);
+                      tutorShifts.sort((a, b) => {
+                        if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
+                        return timeToFloat(a.startTime) - timeToFloat(b.startTime);
+                      });
 
-                    const totalHours = tutorShifts.length * 0.5;
-                    const isHovered = hoveredTutorId === tutor.id;
+                      const totalHours = tutorShifts.length * 0.5;
+                      const isHovered = hoveredTutorId === tutor.id;
 
-                    return (
-                      <div 
-                        key={tutor.id} 
-                        onClick={() => setSelectedTutorModal(tutor)}
-                        onMouseEnter={() => setHoveredTutorId(tutor.id)}
-                        onMouseLeave={() => setHoveredTutorId(null)}
-                        style={{ border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#f8fafc' : '#fff', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
-                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                            <button
-                              onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
-                              style={{ 
-                                background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem',
-                                opacity: isHovered ? 0.7 : 0, transition: 'opacity 0.2s', padding: 0
-                              }}
-                              title="Remove from Schedule"
-                              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-                            >
-                              🗑️
-                            </button>
-                            <span style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s' }}>↗</span>
+                      return (
+                        <div 
+                          key={tutor.id} 
+                          onMouseEnter={() => setHoveredTutorId(tutor.id)}
+                          onMouseLeave={() => setHoveredTutorId(null)}
+                          style={{ border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#f8fafc' : '#fff', cursor: 'default', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
+                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                              <button
+                                onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
+                                style={{ 
+                                  background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem',
+                                  opacity: isHovered ? 0.7 : 0, transition: 'opacity 0.2s', padding: 0
+                                }}
+                                title="Remove from Schedule"
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                              >
+                                🗑️
+                              </button>
+                              <span 
+                                onClick={() => setSelectedTutorModal(tutor)}
+                                style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
+                              >
+                                ↗
+                              </span>
+                            </div>
+                          </div>
+                          <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
+                            <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
+                          </p>
+                          <div style={{ flexGrow: 1 }}>
+                            {tutorShifts.length === 0 ? (
+                              <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', color: '#475569' }}>
+                                {DAYS.map(day => {
+                                  const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter(s => s.day === day);
+                                  if (shiftsForThisDay.length === 0) return null;
+                                  return (
+                                    <div key={day}>
+                                      <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
+                                      {shiftsForThisDay.map((block: any, index: number) => (
+                                        <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
+                                          {format12Hour(block.startTime)} - {format12Hour(block.endTime)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <div 
+                            onClick={() => setSelectedTutorModal(tutor)}
+                            style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#3b82f6', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s', cursor: 'pointer' }}
+                          >
+                            Click to edit schedule
                           </div>
                         </div>
-                        <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
-                          <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
-                        </p>
-                        <div style={{ flexGrow: 1 }}>
-                          {tutorShifts.length === 0 ? (
-                            <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', color: '#475569' }}>
-                              {DAYS.map(day => {
-                                const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter(s => s.day === day);
-                                if (shiftsForThisDay.length === 0) return null;
-                                return (
-                                  <div key={day}>
-                                    <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
-                                    {shiftsForThisDay.map((block: any, index: number) => (
-                                      <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
-                                        {format12Hour(block.startTime)} - {format12Hour(block.endTime)}
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#3b82f6', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s' }}>
-                          Click to edit schedule
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  ) : (
+                    <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No tutors match your search.</p>
+                  )}
                 </div>
 
                 <hr style={{ margin: '3rem 0' }} />

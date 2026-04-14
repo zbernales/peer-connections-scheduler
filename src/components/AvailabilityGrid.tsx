@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { DayOfWeek } from '../types';
+import { floatToTime, format12Hour } from '../utils/scheduler';
 
 interface AvailabilityGridProps {
   selectedSlots: Set<string>;
@@ -20,7 +21,6 @@ export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridPr
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove' | null>(null);
 
-  // Stop dragging if the user lets go of the mouse anywhere on the screen
   useEffect(() => {
     const handleMouseUp = () => {
       setIsDragging(false);
@@ -39,7 +39,6 @@ export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridPr
 
   const handleMouseDown = (cellId: string) => {
     setIsDragging(true);
-    // If they click an already-selected cell, we assume they want to drag to erase
     const mode = selectedSlots.has(cellId) ? 'remove' : 'add';
     setDragMode(mode);
     toggleCell(cellId, mode);
@@ -59,7 +58,6 @@ export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridPr
       
       <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${DAYS.length}, 1fr)`, gap: '4px', minWidth: '600px' }}>
         
-        {/* Header Row: Blank corner + Days */}
         <div></div> 
         {DAYS.map(day => (
           <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
@@ -67,16 +65,14 @@ export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridPr
           </div>
         ))}
 
-        {/* Time Rows */}
         {TIMES.map(time => (
           <div style={{ display: 'contents' }} key={time}>
             
-            {/* The Time Label on the left */}
-            <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-              {time}
+            {/* --- UPDATED: Only show the label if it is the top of the hour! --- */}
+            <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingTop: '4px' }}>
+              {time.endsWith(':00') ? format12Hour(time) : ''}
             </div>
 
-            {/* The Clickable Grid Cells */}
             {DAYS.map(day => {
               const cellId = `${day}-${time}`;
               const isSelected = selectedSlots.has(cellId);

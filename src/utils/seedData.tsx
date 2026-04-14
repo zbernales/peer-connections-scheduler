@@ -8,11 +8,20 @@ const LAST_NAMES = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// A mix of highly common and extremely rare courses
 const MOCK_COURSES = [
-  'MATH 30', 'MATH 31', 'MATH 32', 'PHYS 50', 'PHYS 51', // Common
-  'CS 46A', 'CS 46B', 'CS 146', 'ENGL 1A', 'COMM 20', // Common
-  'AE 160', 'ME 111', 'BUS2 190', 'CHEM 112A', 'ANTH 140' // Rare
+  'MATH 19', 'MATH 30', 'MATH 31', 'MATH 32', 'MATH 42', 'STAT 95',
+  'PHYS 50', 'PHYS 51', 'PHYS 52',
+  'CHEM 1A', 'CHEM 1B', 'CHEM 8',
+  'BIOL 30', 'BIOL 31',
+  'CS 22A', 'CS 46A', 'CS 46B',
+  'ENGL 1A', 'ENGL 1B', 'COMM 20',
+  'CS 146', 'CS 151', 'CMPE 130', 'CMPE 148',
+  'EE 98', 'ME 101', 'ME 111', 'CE 95', 'ISE 130',
+  'BUS1 20', 'BUS1 21', 'BUS2 90', 'BUS3 80',
+  'PSYC 1', 'PSYC 30', 'SOCI 1', 'POLS 15',
+  'AE 160', 'AE 165', 'MATE 25', 'CHEM 112A', 
+  'ANTH 140', 'NUFS 1A', 'CHAD 60', 'KIN 158',
+  'LING 21', 'JPN 1A', 'FREN 1A', 'ISDA 140'
 ];
 
 function getRandomInt(min: number, max: number) {
@@ -31,17 +40,13 @@ function generateRandomAvailability(): TimeSlot[] {
   const workingDays = getRandomItems(DAYS, getRandomInt(3, 5));
 
   workingDays.forEach(day => {
-    // --- SHIFT 1: Morning / Early Afternoon ---
-    // Start between 9:00 AM (18) and 12:00 PM (24)
     const startFloat1 = getRandomInt(18, 24) * 0.5; 
     // Shift is 2 to 5 hours long
     const duration1 = getRandomInt(4, 10) * 0.5; 
     let endFloat1 = startFloat1 + duration1;
-    
-    // Cap at 7:00 PM closing time just in case
+
     if (endFloat1 > 19) endFloat1 = 19; 
 
-    // Push the first block of Lego bricks
     for (let t = startFloat1; t < endFloat1; t += 0.5) {
       availability.push({
         day,
@@ -91,7 +96,7 @@ export async function seedDatabase(count: number = 30) {
     const newTutor: Tutor = {
       id: crypto.randomUUID(),
       name: `${firstName} ${lastName}`,
-      subjects: getRandomItems(MOCK_COURSES, getRandomInt(5, 10)), // 2 to 5 random subjects
+      subjects: getRandomItems(MOCK_COURSES, getRandomInt(4, 10)), // 2 to 5 random subjects
       minHours,
       maxHours,
       availability: generateRandomAvailability()

@@ -93,18 +93,6 @@ function mergeShiftsForUI(shifts: any[]) {
   return merged;
 }
 
-function isOutsideAvailability(tutor: Tutor | undefined, block: any): boolean {
-  if (!tutor) return true;
-  let current = timeToFloat(block.startTime);
-  const end = timeToFloat(block.endTime);
-  while (current < end) {
-    const isAvail = tutor.availability.some(avail => avail.day === block.day && timeToFloat(avail.startTime) <= current && timeToFloat(avail.endTime) >= (current + 0.5));
-    if (!isAvail) return true; 
-    current += 0.5;
-  }
-  return false;
-}
-
 function getMergedWeeklySchedule(weeklyShifts: any[]) {
   if (weeklyShifts.length === 0) return [];
   const groupedByTutor = [...weeklyShifts].sort((a, b) => {
@@ -117,16 +105,6 @@ function getMergedWeeklySchedule(weeklyShifts: any[]) {
     if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
     return timeToFloat(a.startTime) - timeToFloat(b.startTime);
   });
-}
-
-function getMergedDailySchedule(dailyShifts: any[]) {
-  if (dailyShifts.length === 0) return [];
-  const groupedByTutor = [...dailyShifts].sort((a, b) => {
-    if (a.tutorId === b.tutorId) return timeToFloat(a.startTime) - timeToFloat(b.startTime);
-    return a.tutorId.localeCompare(b.tutorId);
-  });
-  const mergedBlocks = mergeShiftsForUI(groupedByTutor);
-  return mergedBlocks.sort((a, b) => timeToFloat(a.startTime) - timeToFloat(b.startTime));
 }
 
 // --- NEW: Security Guard Wrapper for Admin Routes ---

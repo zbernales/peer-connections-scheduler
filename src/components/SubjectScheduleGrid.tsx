@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Shift, DayOfWeek, Tutor } from '../types';
-import { timeToFloat, floatToTime } from '../utils/scheduler';
+import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
 interface SubjectScheduleGridProps {
   subject: string;
@@ -10,7 +10,6 @@ interface SubjectScheduleGridProps {
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// Generate 30-min time slots from 9:00 to 16:30
 const TIMES: string[] = [];
 for (let i = 9; i < 17; i += 0.5) {
   TIMES.push(floatToTime(i));
@@ -19,7 +18,6 @@ for (let i = 9; i < 17; i += 0.5) {
 export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
-  // 1. Build a dictionary mapping "Day-Time" to an Array of Tutor Names
   const coverageMap = new Map<string, string[]>();
 
   shifts.forEach(shift => {
@@ -67,16 +65,12 @@ export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps
           </div>
         ))}
 
-        {/* Time Rows */}
         {TIMES.map(time => (
           <div style={{ display: 'contents' }} key={time}>
-            
-            {/* Time Label */}
             <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-              {time}
+              {time.endsWith(':00') ? format12Hour(time) : ''}
             </div>
 
-            {/* Grid Cells */}
             {DAYS.map(day => {
               const cellId = `${day}-${time}`;
               const tutorsHere = coverageMap.get(cellId) || [];
@@ -96,7 +90,6 @@ export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps
                     cursor: isCovered ? 'pointer' : 'default'
                   }}
                 >
-                  {/* The Custom Hover Tooltip */}
                   {hoveredCell === cellId && isCovered && (
                     <div style={{ 
                       position: 'absolute', 
@@ -110,7 +103,7 @@ export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps
                       fontSize: '0.75rem', 
                       whiteSpace: 'nowrap',
                       zIndex: 50,
-                      pointerEvents: 'none', // Prevents tooltip from flickering
+                      pointerEvents: 'none', 
                       boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
                     }}>
                       {tutorsHere.join(', ')}

@@ -45,7 +45,7 @@ function generateRandomAvailability(): TimeSlot[] {
     const duration1 = getRandomInt(4, 10) * 0.5; 
     let endFloat1 = startFloat1 + duration1;
 
-    if (endFloat1 > 19) endFloat1 = 19; 
+    if (endFloat1 > 17) endFloat1 = 17; 
 
     for (let t = startFloat1; t < endFloat1; t += 0.5) {
       availability.push({
@@ -67,7 +67,7 @@ function generateRandomAvailability(): TimeSlot[] {
       let endFloat2 = startFloat2 + duration2;
 
       // Cap at 7:00 PM
-      if (endFloat2 > 19) endFloat2 = 19;
+      if (endFloat2 > 17) endFloat2 = 17;
 
       // Push the second block of Lego bricks
       for (let t = startFloat2; t < endFloat2; t += 0.5) {

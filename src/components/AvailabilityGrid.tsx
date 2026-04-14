@@ -67,8 +67,6 @@ export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridPr
 
         {TIMES.map(time => (
           <div style={{ display: 'contents' }} key={time}>
-            
-            {/* --- UPDATED: Only show the label if it is the top of the hour! --- */}
             <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingTop: '4px' }}>
               {time.endsWith(':00') ? format12Hour(time) : ''}
             </div>

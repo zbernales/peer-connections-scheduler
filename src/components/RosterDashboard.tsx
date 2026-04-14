@@ -88,7 +88,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           }} 
           style={{ padding: '0.75rem 7rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
         >
-          🧪 Inject 30 Fake Tutors
+          Inject 30 Fake Tutors
         </button>
 
       </div>

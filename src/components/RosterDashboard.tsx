@@ -125,7 +125,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button 
               onClick={handleResetRoster} 
-              style={{ padding: '0.5rem 1rem', backgroundColor: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ padding: '0.5rem 1rem', backgroundColor: 'red', color: 'white', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               Reset Roster
             </button>

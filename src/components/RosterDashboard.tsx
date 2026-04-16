@@ -79,7 +79,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         </button>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
   
-        {/* --- Temporary Seeding Button --- */}
+        {/* --- Temporary Seeding Button --- 
         <button 
           onClick={() => {
             if (window.confirm("WARNING: This will add 30 fake tutors to your live database. Proceed?")) {
@@ -89,7 +89,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           style={{ padding: '0.75rem 7rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Inject 30 Fake Tutors
-        </button>
+        </button> */}
 
       </div>
 

@@ -159,10 +159,10 @@ function App() {
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
-    tutorsPerHour: 2,
+    tutorsPerHour: 5,
     maxConsecutiveHours: 4,
-    minCooldownHours: 1,
-    maxHoursPerDay: 6
+    minCooldownHours: 1.5,
+    maxHoursPerDay: 4
   });
 
   const [schedule, setSchedule] = useState<Shift[]>([]);

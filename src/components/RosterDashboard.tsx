@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
 import { useState } from 'react';
-// import { seedDatabase } from '../utils/seedData';
+import { seedDatabase } from '../utils/seedData';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -79,7 +79,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         </button>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
   
-        {/* --- Temporary Seeding Button --- 
+        {/* --- Temporary Seeding Button ---*/}
         <button 
           onClick={() => {
             if (window.confirm("WARNING: This will add 30 fake tutors to your live database. Proceed?")) {
@@ -89,12 +89,29 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           style={{ padding: '0.75rem 7rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Inject 30 Fake Tutors
-        </button> */}
+        </button> 
 
       </div>
 
         <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <h3 style={{ marginTop: 0 }}>⚙️ Algorithm Settings</h3>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Week</label>
+            <input 
+              type="number" 
+              min="0.5" 
+              step="0.5" 
+              value={config.maxHoursPerWeek || 6} 
+              onChange={e => onConfigChange({...config, maxHoursPerWeek: Number(e.target.value)})} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
+            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+          </div>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Consecutive Hours</label>
@@ -119,12 +136,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
-            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Ideal Tutors per Hour</label>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Tutors per Hour</label>
             <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
           </div>
 

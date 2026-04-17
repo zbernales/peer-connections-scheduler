@@ -341,10 +341,11 @@ function App() {
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
     tutorsPerHour: 8,
-    maxConsecutiveHours: 4,
+    maxConsecutiveHours: 3,
     minCooldownHours: 1,
-    maxHoursPerDay: 6,
-    minHoursPerShift: 1
+    maxHoursPerDay: 4,
+    minHoursPerShift: 1,
+    maxHoursPerWeek: 6
   });
 
   const [schedule, setSchedule] = useState<Shift[]>([]);

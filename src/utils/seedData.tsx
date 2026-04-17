@@ -82,8 +82,8 @@ export async function seedDatabase(count: number = 30) {
     const firstName = FIRST_NAMES[getRandomInt(0, FIRST_NAMES.length - 1)];
     const lastName = LAST_NAMES[getRandomInt(0, LAST_NAMES.length - 1)];
     
-    const minHours = getRandomInt(4, 9);
-    const maxHours = minHours + getRandomInt(4, 9);
+    const minHours = getRandomInt(2, 5);
+    const maxHours = minHours + getRandomInt(1, 4);
 
     const newTutor: Tutor = {
       id: crypto.randomUUID(),

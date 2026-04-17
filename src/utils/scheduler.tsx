@@ -50,13 +50,13 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
   const maxConsecutiveSlots = config.maxConsecutiveHours * 2;
   const minCooldownSlots = config.minCooldownHours * 2;
   const minShiftSlots = (config.minHoursPerShift || 0.5) * 2; 
+  
+  // NEW: Fallback to a high number (e.g., 40) if the config hasn't been set yet
+  const globalMaxWeekly = config.maxHoursPerWeek || 40; 
 
   // ============================================================================
   // --- PRE-COMPUTATION ENGINE ---
   // ============================================================================
-  
-  // Calculate Availability Scarcity
-  // (Finds out exactly how many total hours a tutor is available to work this week)
   const tutorTotalAvailability: Record<string, number> = {};
   tutors.forEach(tutor => {
     let totalHours = 0;
@@ -66,7 +66,6 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     tutorTotalAvailability[tutor.id] = totalHours;
   });
   // ============================================================================
-
 
   for (const day of DAYS) {
     const consecutiveSlotsToday: Record<string, number> = {};
@@ -82,9 +81,12 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     for (let timeSlot = START_HOUR; timeSlot < END_HOUR; timeSlot += 0.5) {
       
       let eligibleTutors = tutors.filter(tutor => {
+        // NEW: Calculate their actual cap for the week
+        const actualMax = Math.min(tutor.maxHours, globalMaxWeekly);
+
         const canWork = isAvailable(tutor, day, timeSlot);
         const notWorking = !isAlreadyWorking(tutor.id, day, timeSlot, schedule);
-        const underWeeklyMax = hoursAssigned[tutor.id] < tutor.maxHours;
+        const underWeeklyMax = hoursAssigned[tutor.id] < actualMax;
         const underDailyMax = hoursAssignedToday[tutor.id] < config.maxHoursPerDay;
         const notOnCooldown = cooldownRemaining[tutor.id] === 0;
 
@@ -96,7 +98,7 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
 
         if (isStartingNewShift && minShiftSlots > 1) {
           const remainingDaily = config.maxHoursPerDay - hoursAssignedToday[tutor.id];
-          const remainingWeekly = tutor.maxHours - hoursAssigned[tutor.id];
+          const remainingWeekly = actualMax - hoursAssigned[tutor.id]; // UPDATED
           if (remainingDaily < (minShiftSlots * 0.5) || remainingWeekly < (minShiftSlots * 0.5)) {
             return false; 
           }
@@ -117,44 +119,43 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
 
       while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < config.tutorsPerHour) {
         
-        // ============================================================================
-        // --- THE SORTING ENGINE ---
-        // ============================================================================
         eligibleTutors.sort((a, b) => {
-          
-          // PRIORITY 1: SHIFT MOMENTUM (Keep people working if they started)
+          // PRIORITY 1: SHIFT MOMENTUM
           const aIsWorking = consecutiveSlotsToday[a.id] > 0;
           const bIsWorking = consecutiveSlotsToday[b.id] > 0;
           if (aIsWorking && !bIsWorking) return -1;
           if (!aIsWorking && bIsWorking) return 1;
 
-          // PRIORITY 2: MINIMUM HOURS (Prioritize people under their minimums)
+          // PRIORITY 2: MINIMUM HOURS
           const aNeedsMin = hoursAssigned[a.id] < a.minHours;
           const bNeedsMin = hoursAssigned[b.id] < b.minHours;
           if (aNeedsMin && !bNeedsMin) return -1;
           if (!aNeedsMin && bNeedsMin) return 1;
 
           // PRIORITY 3: SCARCITY TIE-BREAKER
-          // If they BOTH need minimum hours, prioritize the tutor who has less availability
           if (aNeedsMin && bNeedsMin) {
             const aAvailable = tutorTotalAvailability[a.id];
             const bAvailable = tutorTotalAvailability[b.id];
             if (aAvailable !== bAvailable) {
-              return aAvailable - bAvailable; // Smaller availability moves to the front
+              return aAvailable - bAvailable;
             }
           }
 
-          // PRIORITY 4: MAXIMIZE SUBJECT COVERAGE (The Old Way - Quantity over Rarity)
+          // PRIORITY 4: MAXIMIZE SUBJECT COVERAGE
           const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
           const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
           if (aNewSubjects !== bNewSubjects) {
-            return bNewSubjects - aNewSubjects; // Higher quantity of new subjects moves to the front
+            return bNewSubjects - aNewSubjects;
           }
 
-          // PRIORITY 5: LOAD BALANCING (If all else is equal, give it to whoever has fewer hours)
-          return hoursAssigned[a.id] - hoursAssigned[b.id];
+          // PRIORITY 5: PERCENTAGE-BASED LOAD BALANCING
+          const aActualMax = Math.min(a.maxHours, globalMaxWeekly);
+          const bActualMax = Math.min(b.maxHours, globalMaxWeekly);
+          const aPercentFull = hoursAssigned[a.id] / aActualMax;
+          const bPercentFull = hoursAssigned[b.id] / bActualMax;
+          
+          return aPercentFull - bPercentFull;
         });
-        // ============================================================================
 
         const winner = eligibleTutors[0];
 

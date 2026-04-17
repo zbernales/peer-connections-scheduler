@@ -16,7 +16,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(initialData?.subjects || []);
   const [minHours, setMinHours] = useState<number>(initialData?.minHours || 2);
-  const [maxHours, setMaxHours] = useState<number>(initialData?.maxHours || 10);
+  const [maxHours, setMaxHours] = useState<number>(initialData?.maxHours || 6);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Rebuild the Set<string> grid state from the TimeSlot array
@@ -88,7 +88,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
         setSelectedSubjects([]);
         setSelectedSlots(new Set());
         setMinHours(2);
-        setMaxHours(10);
+        setMaxHours(6);
       }
     } catch (error) {
       console.error("Error adding document: ", error);

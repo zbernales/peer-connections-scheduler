@@ -30,4 +30,5 @@ export interface ScheduleConfig {
   minCooldownHours: number;
   maxHoursPerDay: number;
   minHoursPerShift: number;
+  maxHoursPerWeek?: number;
 }

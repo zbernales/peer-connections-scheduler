@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
 import { useState } from 'react';
-// import { seedDatabase } from '../utils/seedData';
+//import { seedDatabase } from '../utils/seedData';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -97,6 +97,23 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           <h3 style={{ marginTop: 0 }}>⚙️ Algorithm Settings</h3>
 
           <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Week</label>
+            <input 
+              type="number" 
+              min="0.5" 
+              step="0.5" 
+              value={config.maxHoursPerWeek || 6} 
+              onChange={e => onConfigChange({...config, maxHoursPerWeek: Number(e.target.value)})} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+            />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
+            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Consecutive Hours</label>
             <input type="number" min="0.5" step="0.5" value={config.maxConsecutiveHours} onChange={e => onConfigChange({...config, maxConsecutiveHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
           </div>
@@ -116,11 +133,6 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Cooldown Hours (Gap Between Shifts)</label>
             <input type="number" min="0.5" step="0.5" value={config.minCooldownHours} onChange={e => onConfigChange({...config, minCooldownHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
-            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
           </div>
 
           <div style={{ marginBottom: '1rem' }}>

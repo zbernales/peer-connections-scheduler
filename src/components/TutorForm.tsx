@@ -129,7 +129,8 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
               <input 
                 type="number" 
                 required 
-                min="1" 
+                min="2" 
+                max="6" 
                 value={minHours} 
                 onChange={e => setMinHours(Number(e.target.value))} 
                 style={{ width: '80px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '0.25rem' }} 
@@ -144,6 +145,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
                 type="number" 
                 required 
                 min={minHours} 
+                max="10" 
                 value={maxHours} 
                 onChange={e => setMaxHours(Number(e.target.value))} 
                 style={{ width: '80px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '0.25rem' }} 

@@ -2,7 +2,7 @@ import type { Tutor, Shift, DayOfWeek, ScheduleConfig } from '../types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const START_HOUR = 9;  // 9.0 = 9:00 AM
-const END_HOUR = 17;   // 19.0 = 7:00 PM
+const END_HOUR = 19;   // 19.0 = 7:00 PM
 
 export function timeToFloat(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -51,12 +51,9 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
   const minCooldownSlots = config.minCooldownHours * 2;
   const minShiftSlots = (config.minHoursPerShift || 0.5) * 2; 
   
-  // NEW: Fallback to a high number (e.g., 40) if the config hasn't been set yet
   const globalMaxWeekly = config.maxHoursPerWeek || 40; 
-
-  // ============================================================================
-  // --- PRE-COMPUTATION ENGINE ---
-  // ============================================================================
+  
+  // Calculate Availability Scarcity per Tutor
   const tutorTotalAvailability: Record<string, number> = {};
   tutors.forEach(tutor => {
     let totalHours = 0;
@@ -65,9 +62,23 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     });
     tutorTotalAvailability[tutor.id] = totalHours;
   });
-  // ============================================================================
 
-  for (const day of DAYS) {
+  //Calculate the "Hardest Day" (Total availability pool per day)
+  const dailyAvailabilityScore: Record<string, number> = {
+    Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0
+  };
+
+  tutors.forEach(tutor => {
+    tutor.availability.forEach(slot => {
+      const duration = timeToFloat(slot.endTime) - timeToFloat(slot.startTime);
+      dailyAvailabilityScore[slot.day] += duration;
+    });
+  });
+
+  // 3.Sort the days from least available (hardest) to most available (easiest)
+  const sortedDays = [...DAYS].sort((a, b) => dailyAvailabilityScore[a] - dailyAvailabilityScore[b]);
+
+  for (const day of sortedDays) {
     const consecutiveSlotsToday: Record<string, number> = {};
     const cooldownRemaining: Record<string, number> = {};
     const hoursAssignedToday: Record<string, number> = {};
@@ -81,7 +92,6 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     for (let timeSlot = START_HOUR; timeSlot < END_HOUR; timeSlot += 0.5) {
       
       let eligibleTutors = tutors.filter(tutor => {
-        // NEW: Calculate their actual cap for the week
         const actualMax = Math.min(tutor.maxHours, globalMaxWeekly);
 
         const canWork = isAvailable(tutor, day, timeSlot);
@@ -98,7 +108,7 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
 
         if (isStartingNewShift && minShiftSlots > 1) {
           const remainingDaily = config.maxHoursPerDay - hoursAssignedToday[tutor.id];
-          const remainingWeekly = actualMax - hoursAssigned[tutor.id]; // UPDATED
+          const remainingWeekly = actualMax - hoursAssigned[tutor.id]; 
           if (remainingDaily < (minShiftSlots * 0.5) || remainingWeekly < (minShiftSlots * 0.5)) {
             return false; 
           }

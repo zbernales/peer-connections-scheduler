@@ -144,6 +144,21 @@ function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
   );
 }
 
+// --- NEW: Collapsible Section Header ---
+function SectionHeader({ title, isOpen, onToggle }: { title: string, isOpen: boolean, onToggle: () => void }) {
+  return (
+    <div 
+      onClick={onToggle}
+      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: '#f8fafc', padding: '1rem 1.5rem', borderRadius: '8px', marginBottom: isOpen ? '1.5rem' : '0', border: '1px solid #e2e8f0', transition: 'background-color 0.2s', userSelect: 'none' }}
+    >
+      <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#1e293b' }}>{title}</h2>
+      <span style={{ fontSize: '1.2rem', color: '#64748b', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
+        ▼
+      </span>
+    </div>
+  );
+}
+
 function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: ScheduleConfig }) {
   const times: number[] = [];
   for (let i = 9; i < 17; i += 0.5) {
@@ -158,8 +173,7 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
 
   return (
     <div style={{ marginBottom: '3rem', backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem' }}>
-        <h3 style={{ margin: 0, color: '#1e293b' }}>Coverage Heat Map</h3>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '1rem' }}>
         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
           Darker green = Closer to maximum capacity ({config.tutorsPerHour} tutors)
         </span>
@@ -406,6 +420,11 @@ function App() {
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
   const [activeRoster, setActiveRoster] = useState<Tutor[]>([]); 
 
+  // --- NEW: Toggle states for the 3 sections ---
+  const [isTutorsOpen, setIsTutorsOpen] = useState(true);
+  const [isHeatmapOpen, setIsHeatmapOpen] = useState(true);
+  const [isSubjectsOpen, setIsSubjectsOpen] = useState(true);
+
   const [selectedTutorModal, setSelectedTutorModal] = useState<Tutor | null>(null);
   const [hoveredTutorId, setHoveredTutorId] = useState<string | null>(null);
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
@@ -580,7 +599,6 @@ function App() {
             isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />
           } />
 
-          {/* --- UPDATED: Admin Routes wrapped in ProtectedRoute --- */}
           <Route path="/admin" element={
             <ProtectedRoute isAdmin={isAdmin}>
               <RosterDashboard 
@@ -650,162 +668,184 @@ function App() {
                 </div>
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
-                <h2>Tutor Breakdowns</h2>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <input 
-                    type="text" 
-                    placeholder="🔍 Search for a specific tutor..." 
-                    value={tutorSearchQuery}
-                    onChange={(e) => setTutorSearchQuery(e.target.value)}
-                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-                  {filteredTutors.length > 0 ? (
-                    filteredTutors.map(tutor => {
-                      const tutorShifts = schedule.filter(s => s.tutorId === tutor.id);
-                      tutorShifts.sort((a, b) => {
-                        if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
-                        return timeToFloat(a.startTime) - timeToFloat(b.startTime);
-                      });
-
-                      const totalHours = tutorShifts.length * 0.5;
-                      const isHovered = hoveredTutorId === tutor.id;
-
-                      return (
-                        <div 
-                          key={tutor.id} 
-                          onMouseEnter={() => setHoveredTutorId(tutor.id)}
-                          onMouseLeave={() => setHoveredTutorId(null)}
-                          style={{ border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#f8fafc' : '#fff', cursor: 'default', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
-                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                              <button
-                                onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
-                                style={{ 
-                                  background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem',
-                                  opacity: isHovered ? 0.7 : 0, transition: 'opacity 0.2s', padding: 0
-                                }}
-                                title="Remove from Schedule"
-                                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-                              >
-                                🗑️
-                              </button>
-                              <span 
-                                onClick={() => setSelectedTutorModal(tutor)}
-                                style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
-                              >
-                                ↗
-                              </span>
-                            </div>
-                          </div>
-                          <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
-                            <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
-                          </p>
-                          <div style={{ flexGrow: 1 }}>
-                            {tutorShifts.length === 0 ? (
-                              <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', color: '#475569' }}>
-                                {DAYS.map(day => {
-                                  const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter(s => s.day === day);
-                                  if (shiftsForThisDay.length === 0) return null;
-                                  return (
-                                    <div key={day}>
-                                      <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
-                                      {shiftsForThisDay.map((block: any, index: number) => (
-                                        <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
-                                          {format12Hour(block.startTime)} - {format12Hour(block.endTime)}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                          <div 
-                            onClick={() => setSelectedTutorModal(tutor)}
-                            style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#3b82f6', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s', cursor: 'pointer' }}
-                          >
-                            Click to edit schedule
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No tutors match your search.</p>
-                  )}
-                </div>
+                {/* --- COLLAPSIBLE SECTION 1: Tutor Breakdowns --- */}
+                <SectionHeader title="Tutor Breakdowns" isOpen={isTutorsOpen} onToggle={() => setIsTutorsOpen(!isTutorsOpen)} />
                 
-                {schedule.length > 0 && (
-                  <ScheduleHeatmap schedule={schedule} config={scheduleConfig} />
+                {isTutorsOpen && (
+                  <div style={{ paddingBottom: '1rem' }}>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="🔍 Search for a specific tutor..." 
+                        value={tutorSearchQuery}
+                        onChange={(e) => setTutorSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                      {filteredTutors.length > 0 ? (
+                        filteredTutors.map(tutor => {
+                          const tutorShifts = schedule.filter(s => s.tutorId === tutor.id);
+                          tutorShifts.sort((a, b) => {
+                            if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
+                            return timeToFloat(a.startTime) - timeToFloat(b.startTime);
+                          });
+
+                          const totalHours = tutorShifts.length * 0.5;
+                          const isHovered = hoveredTutorId === tutor.id;
+
+                          return (
+                            <div 
+                              key={tutor.id} 
+                              onMouseEnter={() => setHoveredTutorId(tutor.id)}
+                              onMouseLeave={() => setHoveredTutorId(null)}
+                              style={{ border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#f8fafc' : '#fff', cursor: 'default', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                  <button
+                                    onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
+                                    style={{ 
+                                      background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem',
+                                      opacity: isHovered ? 0.7 : 0, transition: 'opacity 0.2s', padding: 0
+                                    }}
+                                    title="Remove from Schedule"
+                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                                  >
+                                    🗑️
+                                  </button>
+                                  <span 
+                                    onClick={() => setSelectedTutorModal(tutor)}
+                                    style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
+                                  >
+                                    ↗
+                                  </span>
+                                </div>
+                              </div>
+                              <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
+                                <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
+                              </p>
+                              <div style={{ flexGrow: 1 }}>
+                                {tutorShifts.length === 0 ? (
+                                  <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', color: '#475569' }}>
+                                    {DAYS.map(day => {
+                                      const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter(s => s.day === day);
+                                      if (shiftsForThisDay.length === 0) return null;
+                                      return (
+                                        <div key={day}>
+                                          <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
+                                          {shiftsForThisDay.map((block: any, index: number) => (
+                                            <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
+                                              {format12Hour(block.startTime)} - {format12Hour(block.endTime)}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                              <div 
+                                onClick={() => setSelectedTutorModal(tutor)}
+                                style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', color: '#3b82f6', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center', opacity: isHovered ? 1 : 0.7, transition: 'opacity 0.2s', cursor: 'pointer' }}
+                              >
+                                Click to edit schedule
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No tutors match your search.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <hr style={{ margin: '3rem 0' }} />
+
+                {/* --- COLLAPSIBLE SECTION 2: Coverage Heat Map --- */}
+                <SectionHeader title="Coverage Heat Map" isOpen={isHeatmapOpen} onToggle={() => setIsHeatmapOpen(!isHeatmapOpen)} />
+                
+                {isHeatmapOpen && (
+                  <div style={{ paddingBottom: '1rem' }}>
+                    {schedule.length > 0 ? (
+                      <ScheduleHeatmap schedule={schedule} config={scheduleConfig} />
+                    ) : (
+                      <p style={{ color: '#64748b', fontStyle: 'italic' }}>Generate a schedule to view the heat map.</p>
+                    )}
+                  </div>
                 )}
 
                 <hr style={{ margin: '3rem 0' }} />
 
-                <h2>Subject Coverage</h2>
+                {/* --- COLLAPSIBLE SECTION 3: Subject Coverage --- */}
+                <SectionHeader title="Subject Coverage" isOpen={isSubjectsOpen} onToggle={() => setIsSubjectsOpen(!isSubjectsOpen)} />
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <input 
-                    type="text" 
-                    placeholder="🔍 Search for a specific class (e.g., CS 146, Math)..." 
-                    value={subjectSearchQuery}
-                    onChange={(e) => setSubjectSearchQuery(e.target.value)}
-                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                  />
-                </div>
+                {isSubjectsOpen && (
+                  <div style={{ paddingBottom: '1rem' }}>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="🔍 Search for a specific class (e.g., CS 146, Math)..." 
+                        value={subjectSearchQuery}
+                        onChange={(e) => setSubjectSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                      />
+                    </div>
 
-                {subjectSearchQuery ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', paddingBottom: '3rem' }}>
-                    {filteredSubjects.length > 0 ? (
-                      filteredSubjects.map(subject => (
-                        <SubjectCard key={subject} subject={subject} schedule={schedule} activeRoster={activeRoster} hoveredSubject={hoveredSubject} setHoveredSubject={setHoveredSubject} setSelectedSubjectModal={setSelectedSubjectModal} />
-                      ))
+                    {subjectSearchQuery ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', paddingBottom: '3rem' }}>
+                        {filteredSubjects.length > 0 ? (
+                          filteredSubjects.map(subject => (
+                            <SubjectCard key={subject} subject={subject} schedule={schedule} activeRoster={activeRoster} hoveredSubject={hoveredSubject} setHoveredSubject={setHoveredSubject} setSelectedSubjectModal={setSelectedSubjectModal} />
+                          ))
+                        ) : (
+                          <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No subjects match your search.</p>
+                        )}
+                      </div>
                     ) : (
-                      <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No subjects match your search.</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '3rem' }}>
+                        {Object.entries(subjectsByDept).sort().map(([dept, deptSubjects]) => {
+                          const isExpanded = expandedDepartments.has(dept);
+                          return (
+                            <div key={dept} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: 'white', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                              
+                              <button 
+                                onClick={() => toggleDepartment(dept)}
+                                style={{ width: '100%', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#f8fafc' : 'white', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background-color 0.2s' }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>{dept}</h3>
+                                  <span style={{ backgroundColor: '#e2e8f0', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', color: '#475569', fontWeight: 'bold' }}>
+                                    {deptSubjects.length} classes
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: '1.2rem', color: '#64748b', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
+                                  ▼
+                                </span>
+                              </button>
+
+                              {isExpanded && (
+                                <div style={{ padding: '1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                                    {deptSubjects.map(subject => (
+                                      <SubjectCard key={subject} subject={subject} schedule={schedule} activeRoster={activeRoster} hoveredSubject={hoveredSubject} setHoveredSubject={setHoveredSubject} setSelectedSubjectModal={setSelectedSubjectModal} />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '3rem' }}>
-                    {Object.entries(subjectsByDept).sort().map(([dept, deptSubjects]) => {
-                      const isExpanded = expandedDepartments.has(dept);
-                      return (
-                        <div key={dept} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: 'white', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                          
-                          <button 
-                            onClick={() => toggleDepartment(dept)}
-                            style={{ width: '100%', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#f8fafc' : 'white', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background-color 0.2s' }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>{dept}</h3>
-                              <span style={{ backgroundColor: '#e2e8f0', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem', color: '#475569', fontWeight: 'bold' }}>
-                                {deptSubjects.length} classes
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '1.2rem', color: '#64748b', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
-                              ▼
-                            </span>
-                          </button>
-
-                          {isExpanded && (
-                            <div style={{ padding: '1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                                {deptSubjects.map(subject => (
-                                  <SubjectCard key={subject} subject={subject} schedule={schedule} activeRoster={activeRoster} hoveredSubject={hoveredSubject} setHoveredSubject={setHoveredSubject} setSelectedSubjectModal={setSelectedSubjectModal} />
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                        </div>
-                      );
-                    })}
                   </div>
                 )}
 

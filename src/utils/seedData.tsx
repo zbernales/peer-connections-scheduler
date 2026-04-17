@@ -36,11 +36,13 @@ function getRandomItems<T>(arr: T[], count: number): T[] {
 function generateRandomAvailability(): TimeSlot[] {
   const availability: TimeSlot[] = [];
   
-  const workingDays = getRandomItems(DAYS, getRandomInt(3, 5));
+  // 1. REALISTIC: Students usually only work 2 to 4 days a week
+  const workingDays = getRandomItems(DAYS, getRandomInt(2, 4));
 
   workingDays.forEach(day => {
-    const startFloat1 = getRandomInt(18, 24) * 0.5; 
-    const duration1 = getRandomInt(4, 10) * 0.5; 
+    const startFloat1 = getRandomInt(18, 30) * 0.5; 
+    
+    const duration1 = getRandomInt(2, 6) * 0.5; 
     let endFloat1 = startFloat1 + duration1;
 
     if (endFloat1 > 17) endFloat1 = 17; 
@@ -53,11 +55,11 @@ function generateRandomAvailability(): TimeSlot[] {
       });
     }
 
-    if (Math.random() > 0.6 && endFloat1 < 17) {
-      const gap = getRandomInt(2, 5) * 0.5; 
-      const startFloat2 = endFloat1 + gap;
+    if (Math.random() > 0.7 && endFloat1 < 17) {
       
-      const duration2 = getRandomInt(4, 8) * 0.5; 
+      const gap = getRandomInt(3, 7) * 0.5; 
+      const startFloat2 = endFloat1 + gap;
+      const duration2 = getRandomInt(2, 4) * 0.5; 
       let endFloat2 = startFloat2 + duration2;
 
       if (endFloat2 > 17) endFloat2 = 17;

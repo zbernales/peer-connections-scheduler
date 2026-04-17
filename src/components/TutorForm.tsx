@@ -120,7 +120,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem' }}>
-            <strong>Target Weekly Hours</strong>
+            <strong>Target Weekly Hours for Tutoring</strong>
           </label>
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>

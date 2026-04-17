@@ -124,7 +124,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Ideal Tutors per Hour</label>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Tutors per Hour</label>
             <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
           </div>
 

@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
 import { useState } from 'react';
-// import { seedDatabase } from '../utils/seedData';
+//import { seedDatabase } from '../utils/seedData';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -79,7 +79,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         </button>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
   
-        {/* --- Temporary Seeding Button ---
+        {/* --- Temporary Seeding Button --- 
         <button 
           onClick={() => {
             if (window.confirm("WARNING: This will add 30 fake tutors to your live database. Proceed?")) {

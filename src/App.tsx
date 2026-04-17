@@ -144,6 +144,77 @@ function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
   );
 }
 
+function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: ScheduleConfig }) {
+  const times: number[] = [];
+  for (let i = 9; i < 17; i += 0.5) {
+    times.push(i);
+  }
+
+  const counts: Record<string, number> = {};
+  schedule.forEach(shift => {
+    const key = `${shift.day}-${timeToFloat(shift.startTime)}`;
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  return (
+    <div style={{ marginBottom: '3rem', backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0, color: '#1e293b' }}>Coverage Heat Map</h3>
+        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+          Darker green = Closer to maximum capacity ({config.tutorsPerHour} tutors)
+        </span>
+      </div>
+      
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.9rem' }}>
+          <thead>
+            <tr>
+              <th style={{ padding: '0.75rem', borderBottom: '2px solid #cbd5e1', color: '#475569', width: '100px' }}>Time</th>
+              {DAYS.map(day => (
+                <th key={day} style={{ padding: '0.75rem', borderBottom: '2px solid #cbd5e1', color: '#1e293b' }}>{day}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {times.map(t => (
+              <tr key={t}>
+                <td style={{ padding: '0.5rem', borderBottom: '1px solid #e2e8f0', fontWeight: 'bold', color: '#64748b', borderRight: '2px solid #e2e8f0' }}>
+                  {format12Hour(floatToTime(t))}
+                </td>
+                {DAYS.map(day => {
+                  const count = counts[`${day}-${t}`] || 0;
+                  
+                  const intensity = count / config.tutorsPerHour;
+                  
+                  const bgColor = count === 0 
+                    ? '#f8fafc' 
+                    : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
+                  
+                  const textColor = intensity > 0.6 ? 'white' : '#1e293b';
+
+                  return (
+                    <td key={day} style={{ 
+                      padding: '0.5rem', 
+                      borderBottom: '1px solid #e2e8f0',
+                      borderRight: '1px solid #e2e8f0',
+                      backgroundColor: bgColor,
+                      color: textColor,
+                      transition: 'background-color 0.2s',
+                      fontWeight: count > 0 ? 'bold' : 'normal'
+                    }}>
+                      {count > 0 ? count : '-'}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHoveredSubject, setSelectedSubjectModal }: any) {
   const subjectShifts = schedule.filter((s: any) => s.subjects.includes(subject));
   const isHovered = hoveredSubject === subject;
@@ -538,7 +609,6 @@ function App() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h1>Master Schedule Dashboard</h1>
-                  
                   <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     
                     {activeScheduleMeta ? (
@@ -572,7 +642,7 @@ function App() {
                         ))}
                       </select>
                     )}
-
+                    
                     <span style={{ backgroundColor: '#e2e8f0', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 'bold' }}>
                       Total Tutors: {activeRoster.length}
                     </span>
@@ -580,7 +650,6 @@ function App() {
                 </div>
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
-
                 <h2>Tutor Breakdowns</h2>
 
                 <div style={{ marginBottom: '1.5rem' }}>
@@ -673,10 +742,14 @@ function App() {
                     <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No tutors match your search.</p>
                   )}
                 </div>
+                
+                {schedule.length > 0 && (
+                  <ScheduleHeatmap schedule={schedule} config={scheduleConfig} />
+                )}
 
                 <hr style={{ margin: '3rem 0' }} />
 
-                <h2>3. Subject Coverage</h2>
+                <h2>Subject Coverage</h2>
 
                 <div style={{ marginBottom: '1.5rem' }}>
                   <input 

@@ -118,14 +118,37 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div>
-            <label><strong>Min Hours:</strong></label><br/>
-            <input type="number" required min="1" value={minHours} onChange={e => setMinHours(Number(e.target.value))} style={{ width: '80px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
-          </div>
-          <div>
-            <label><strong>Max Hours:</strong></label><br/>
-            <input type="number" required min={minHours} value={maxHours} onChange={e => setMaxHours(Number(e.target.value))} style={{ width: '80px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+            <strong>Target Weekly Hours</strong>
+          </label>
+          
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div>
+              <label style={{ fontSize: '0.9rem', color: '#475569' }}>Low:</label><br/>
+              <input 
+                type="number" 
+                required 
+                min="1" 
+                value={minHours} 
+                onChange={e => setMinHours(Number(e.target.value))} 
+                style={{ width: '80px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '0.25rem' }} 
+              />
+            </div>
+            
+            <span style={{ color: '#94a3b8', marginTop: '1.5rem' }}>—</span>
+            
+            <div>
+              <label style={{ fontSize: '0.9rem', color: '#475569' }}>High:</label><br/>
+              <input 
+                type="number" 
+                required 
+                min={minHours} 
+                value={maxHours} 
+                onChange={e => setMaxHours(Number(e.target.value))} 
+                style={{ width: '80px', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '0.25rem' }} 
+              />
+            </div>
           </div>
         </div>
       </div>

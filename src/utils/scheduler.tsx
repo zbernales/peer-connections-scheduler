@@ -1,14 +1,9 @@
 import type { Tutor, Shift, DayOfWeek, ScheduleConfig } from '../types';
- 
+
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const START_HOUR = 9;  // 9.0 = 9:00 AM
-const END_HOUR = 17;   // 17.0 = 5:00 PM
+const END_HOUR = 17;   // 19.0 = 7:00 PM
 
-export const MAX_CONSECUTIVE_HOURS = 5; 
-export const MIN_COOLDOWN_HOURS = 1.5;
-export const MAX_HOURS_PER_DAY = 5;
-
-// --- TIME HELPERS ---
 export function timeToFloat(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours + (minutes / 60);
@@ -18,6 +13,14 @@ export function floatToTime(timeFloat: number): string {
   const hours = Math.floor(timeFloat);
   const minutes = Math.round((timeFloat - hours) * 60);
   return `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : minutes}`;
+}
+
+export function format12Hour(time24: string): string {
+  const [h, m] = time24.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const hr12 = h % 12 || 12;
+  const minStr = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`;
+  return `${hr12}${minStr}${ampm}`;
 }
 
 // --- CONSTRAINT HELPERS ---
@@ -44,9 +47,26 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
   const hoursAssigned: Record<string, number> = {};
   tutors.forEach(t => hoursAssigned[t.id] = 0);
 
-  // Convert the dynamic config hours into 30-minute slots for the loop
   const maxConsecutiveSlots = config.maxConsecutiveHours * 2;
   const minCooldownSlots = config.minCooldownHours * 2;
+  const minShiftSlots = (config.minHoursPerShift || 0.5) * 2; 
+
+  // ============================================================================
+  // --- PRE-COMPUTATION ENGINE ---
+  // ============================================================================
+  
+  // Calculate Availability Scarcity
+  // (Finds out exactly how many total hours a tutor is available to work this week)
+  const tutorTotalAvailability: Record<string, number> = {};
+  tutors.forEach(tutor => {
+    let totalHours = 0;
+    tutor.availability.forEach(slot => {
+      totalHours += (timeToFloat(slot.endTime) - timeToFloat(slot.startTime));
+    });
+    tutorTotalAvailability[tutor.id] = totalHours;
+  });
+  // ============================================================================
+
 
   for (const day of DAYS) {
     const consecutiveSlotsToday: Record<string, number> = {};
@@ -65,42 +85,76 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
         const canWork = isAvailable(tutor, day, timeSlot);
         const notWorking = !isAlreadyWorking(tutor.id, day, timeSlot, schedule);
         const underWeeklyMax = hoursAssigned[tutor.id] < tutor.maxHours;
-        // Use the dynamic daily max from config
         const underDailyMax = hoursAssignedToday[tutor.id] < config.maxHoursPerDay;
         const notOnCooldown = cooldownRemaining[tutor.id] === 0;
 
-        return canWork && notWorking && underWeeklyMax && underDailyMax && notOnCooldown;
+        if (!canWork || !notWorking || !underWeeklyMax || !underDailyMax || !notOnCooldown) {
+          return false;
+        }
+
+        const isStartingNewShift = consecutiveSlotsToday[tutor.id] === 0;
+
+        if (isStartingNewShift && minShiftSlots > 1) {
+          const remainingDaily = config.maxHoursPerDay - hoursAssignedToday[tutor.id];
+          const remainingWeekly = tutor.maxHours - hoursAssigned[tutor.id];
+          if (remainingDaily < (minShiftSlots * 0.5) || remainingWeekly < (minShiftSlots * 0.5)) {
+            return false; 
+          }
+
+          for (let i = 1; i < minShiftSlots; i++) { 
+            const futureSlot = timeSlot + (i * 0.5);
+            if (futureSlot >= END_HOUR || !isAvailable(tutor, day, futureSlot)) {
+              return false;
+            }
+          }
+        }
+        return true;
       });
 
       const coveredSubjectsThisSlot = new Set<string>();
       let tutorsScheduledThisSlot = 0;
       const scheduledThisBlock = new Set<string>();
 
-      // Use the dynamic tutorsPerHour from config
       while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < config.tutorsPerHour) {
+        
+        // ============================================================================
+        // --- THE SORTING ENGINE ---
+        // ============================================================================
         eligibleTutors.sort((a, b) => {
           
-          // 1. SHIFT MOMENTUM: If you are already working, you get priority to KEEP working
-          // This prevents the algorithm from randomly swapping tutors and creating 30-min holes.
+          // PRIORITY 1: SHIFT MOMENTUM (Keep people working if they started)
           const aIsWorking = consecutiveSlotsToday[a.id] > 0;
           const bIsWorking = consecutiveSlotsToday[b.id] > 0;
           if (aIsWorking && !bIsWorking) return -1;
           if (!aIsWorking && bIsWorking) return 1;
 
-          // 2. Maximize Subject Coverage
-          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
-          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
-          if (aNewSubjects !== bNewSubjects) return bNewSubjects - aNewSubjects;
-
-          // 3. Prioritize those who need minimum hours
+          // PRIORITY 2: MINIMUM HOURS (Prioritize people under their minimums)
           const aNeedsMin = hoursAssigned[a.id] < a.minHours;
           const bNeedsMin = hoursAssigned[b.id] < b.minHours;
           if (aNeedsMin && !bNeedsMin) return -1;
           if (!aNeedsMin && bNeedsMin) return 1;
 
-          // 4. Balance total hours assigned
+          // PRIORITY 3: SCARCITY TIE-BREAKER
+          // If they BOTH need minimum hours, prioritize the tutor who has less availability
+          if (aNeedsMin && bNeedsMin) {
+            const aAvailable = tutorTotalAvailability[a.id];
+            const bAvailable = tutorTotalAvailability[b.id];
+            if (aAvailable !== bAvailable) {
+              return aAvailable - bAvailable; // Smaller availability moves to the front
+            }
+          }
+
+          // PRIORITY 4: MAXIMIZE SUBJECT COVERAGE (The Old Way - Quantity over Rarity)
+          const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
+          const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
+          if (aNewSubjects !== bNewSubjects) {
+            return bNewSubjects - aNewSubjects; // Higher quantity of new subjects moves to the front
+          }
+
+          // PRIORITY 5: LOAD BALANCING (If all else is equal, give it to whoever has fewer hours)
           return hoursAssigned[a.id] - hoursAssigned[b.id];
         });
+        // ============================================================================
 
         const winner = eligibleTutors[0];
 
@@ -122,27 +176,17 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
         eligibleTutors = eligibleTutors.filter(t => t.id !== winner.id);
       }
 
-      // AFTER THE BLOCK IS SCHEDULED: Update fatigue and cooldowns
       tutors.forEach(tutor => {
         if (scheduledThisBlock.has(tutor.id)) {
-          // They worked this slot
           consecutiveSlotsToday[tutor.id] += 1;
-          
-          // Did they just hit the fatigue limit based on dynamic config?
           if (consecutiveSlotsToday[tutor.id] >= maxConsecutiveSlots) {
             cooldownRemaining[tutor.id] = minCooldownSlots; 
             consecutiveSlotsToday[tutor.id] = 0; 
           }
         } else {
-          // They didn't work this slot. 
           if (cooldownRemaining[tutor.id] > 0) {
-            // If they are already in timeout, tick down the timer
             cooldownRemaining[tutor.id] -= 1;
           } else if (consecutiveSlotsToday[tutor.id] > 0) {
-            // *** THE STRICT GAP FIX ***
-            // They were working previously, but didn't get this slot.
-            // Force them into a full cooldown so they don't get a 30-minute gap!
-            // We subtract 1 because they are already sitting out this current slot.
             cooldownRemaining[tutor.id] = minCooldownSlots - 1; 
             consecutiveSlotsToday[tutor.id] = 0;
           }

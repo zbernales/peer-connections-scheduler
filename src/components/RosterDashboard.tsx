@@ -4,21 +4,22 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
 import { useState } from 'react';
+// import { seedDatabase } from '../utils/seedData';
 
 interface RosterDashboardProps {
   roster: Tutor[];
   config: ScheduleConfig;
   onConfigChange: (newConfig: ScheduleConfig) => void;
   onSelectTutor: (tutor: Tutor) => void;
-  onGenerate: () => void; // <-- ADDED THIS!
+  onGenerate: () => void; 
 }
 
-export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor, onGenerate }: RosterDashboardProps) { // <-- ADDED HERE!
+export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor, onGenerate }: RosterDashboardProps) { 
   const navigate = useNavigate();
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
 
   const handleDelete = async (tutorId: string, tutorName: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Don't trigger the row click
+    e.stopPropagation(); 
     if (window.confirm(`Are you sure you want to permanently delete ${tutorName}?`)) {
       try {
         await deleteDoc(doc(db, 'tutors', tutorId));
@@ -29,10 +30,33 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
     }
   };
 
+  const handleResetRoster = async () => {
+    const confirmMessage = "Are you sure you want to clear the entire roster? \n\nThis will permanently delete ALL current tutors from the active database. \n\n(Your previously Saved Schedules will remain intact)";
+    
+    if (roster.length === 0) {
+      alert("The roster is already empty.");
+      return;
+    }
+
+    if (window.confirm(confirmMessage)) {
+      try {
+        // Create an array of delete promises for every tutor in the roster
+        const deletePromises = roster.map(tutor => deleteDoc(doc(db, 'tutors', tutor.id)));
+        
+        // Wait for all deletions to finish
+        await Promise.all(deletePromises);
+        alert("Roster successfully reset.");
+      } catch (error) {
+        console.error("Error resetting roster:", error);
+        alert("Failed to reset roster.");
+      }
+    }
+  };
+
   const handleSaveEdit = async (updatedTutorData: any) => {
     try {
       await updateDoc(doc(db, 'tutors', updatedTutorData.id), updatedTutorData);
-      setEditingTutor(null); // Close the modal
+      setEditingTutor(null); 
     } catch (error) {
       console.error("Error updating tutor:", error);
       alert("Failed to update tutor.");
@@ -46,21 +70,31 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
       <div style={{ flex: '0 0 350px', position: 'sticky', top: '2rem' }}>
         <button 
           onClick={() => {
-            onGenerate(); // <-- RUNS THE ALGORITHM FIRST!
-            navigate('/schedule'); // <-- THEN MOVES TO THE PAGE!
+            onGenerate(); 
+            navigate('/schedule'); 
           }}
           style={{ width: '100%', padding: '1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '2rem', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)' }}
         >
           Generate Schedule
         </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+  
+        {/* --- Temporary Seeding Button --- 
+        <button 
+          onClick={() => {
+            if (window.confirm("WARNING: This will add 30 fake tutors to your live database. Proceed?")) {
+              seedDatabase(30);
+            }
+          }} 
+          style={{ padding: '0.75rem 7rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          Inject 30 Fake Tutors
+        </button> */}
+
+      </div>
 
         <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <h3 style={{ marginTop: 0 }}>⚙️ Algorithm Settings</h3>
-          
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Ideal Tutors per Hour</label>
-            <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
-          </div>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Consecutive Hours</label>
@@ -68,7 +102,19 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Cooldown Hours</label>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Hours Per Shift</label>
+            <input 
+              type="number" 
+              min="0.5" 
+              step="0.5" 
+              value={config.minHoursPerShift || 0.5} 
+              onChange={e => onConfigChange({...config, minHoursPerShift: Number(e.target.value)})} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+            />
+          </div>
+          
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Cooldown Hours (Gap Between Shifts)</label>
             <input type="number" min="0.5" step="0.5" value={config.minCooldownHours} onChange={e => onConfigChange({...config, minCooldownHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
           </div>
 
@@ -76,6 +122,12 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
             <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
           </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Ideal Tutors per Hour</label>
+            <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+          </div>
+
         </div>
       </div>
 
@@ -83,7 +135,22 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2 style={{ margin: 0 }}>Tutor Roster ({roster.length})</h2>
-          <button onClick={() => navigate('/submit')} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Add Tutor</button>
+          
+          {/* --- UPDATED BUTTON GROUP --- */}
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button 
+              onClick={handleResetRoster} 
+              style={{ padding: '0.5rem 1rem', backgroundColor: 'red', color: 'white', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Reset Roster
+            </button>
+            <button 
+              onClick={() => navigate('/submit')} 
+              style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              + Add Tutor
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -105,7 +172,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button 
                     onClick={(e) => { 
-                    e.stopPropagation(); // Prevents clicking the row behind the button
+                    e.stopPropagation(); 
                     setEditingTutor(tutor); 
                     }} 
                     style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}
@@ -116,7 +183,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
               </div>
             </div>
           ))}
-          {roster.length === 0 && <p style={{ color: '#64748b' }}>No tutors found. Click "Add Tutor" to get started.</p>}
+          {roster.length === 0 && <p style={{ color: '#64748b' }}>No tutors found. Click "+ Add Tutor" to get started.</p>}
         </div>
       </div>
       

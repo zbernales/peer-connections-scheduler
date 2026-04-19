@@ -3,7 +3,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AvailabilityGrid } from './AvailabilityGrid';
 import { SubjectSelector } from './SubjectSelector';
-import { timeToFloat, floatToTime } from '../utils/scheduler'; // <-- NEW IMPORT!
+import { timeToFloat, floatToTime } from '../utils/scheduler';
 import type { Tutor, TimeSlot, DayOfWeek } from '../types';
 
 interface TutorFormProps {
@@ -17,13 +17,14 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(initialData?.subjects || []);
   const [minHours, setMinHours] = useState<number>(initialData?.minHours || 2);
   const [maxHours, setMaxHours] = useState<number>(initialData?.maxHours || 6);
+  
+  // NEW: State to track if the night grid should be shown
+  const [canTutorAtNight, setCanTutorAtNight] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Rebuild the Set<string> grid state from the TimeSlot array
   const defaultSlots = new Set<string>();
   if (initialData?.availability) {
     initialData.availability.forEach(slot => {
-      // Unpack the consolidated block (e.g., 9:00 to 12:00) back into 30-min chunks
       let current = timeToFloat(slot.startTime);
       const end = timeToFloat(slot.endTime);
 
@@ -50,7 +51,6 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
     setIsSubmitting(true);
 
-    // Convert the Grid Set back into the TimeSlot array our algorithm expects
     const availability: TimeSlot[] = Array.from(selectedSlots).map(slotId => {
       const [day, startTime] = slotId.split('-'); 
       
@@ -89,6 +89,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
         setSelectedSlots(new Set());
         setMinHours(2);
         setMaxHours(6);
+        setCanTutorAtNight(false); // Reset the toggle
       }
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -157,13 +158,40 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
       <hr style={{ margin: '1.5rem 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
 
-      <h3 style={{ marginBottom: '0.5rem' }}>Availability</h3>
+      <h3 style={{ marginBottom: '0.5rem' }}>Daytime Availability</h3>
       
-      {/* Inject the Grid Here */}
       <AvailabilityGrid 
         selectedSlots={selectedSlots} 
         onChange={setSelectedSlots} 
+        startHour={9}  // Starts at 9:00 AM
+        endHour={17}   // Ends at 5:00 PM
       />
+
+      {/* --- NEW: Night Tutoring Block --- */}
+      <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+          <input 
+            type="checkbox" 
+            checked={canTutorAtNight} 
+            onChange={(e) => setCanTutorAtNight(e.target.checked)} 
+            style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+          />
+          <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>I am available to tutor at night (5:00 PM - 10:00 PM)</strong>
+        </label>
+
+        {canTutorAtNight && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#475569' }}>Night Availability</h4>
+            <AvailabilityGrid 
+              selectedSlots={selectedSlots} 
+              onChange={setSelectedSlots} 
+              startHour={17} // Starts at 5:00 PM
+              endHour={22}   // Ends at 10:00 PM
+            />
+          </div>
+        )}
+      </div>
+      {/* --------------------------------- */}
 
       <br />
       

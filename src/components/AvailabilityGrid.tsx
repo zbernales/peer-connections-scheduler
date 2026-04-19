@@ -1,25 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { DayOfWeek } from '../types';
 import { format12Hour } from '../utils/scheduler';
 
+// --- NEW: Add startHour and endHour to the props interface ---
 interface AvailabilityGridProps {
   selectedSlots: Set<string>;
   onChange: (newSlots: Set<string>) => void;
+  startHour?: number;
+  endHour?: number;
 }
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-// Generate 30-min time slots from 9:00 to 16:30
-const TIMES: string[] = [];
-for (let i = 9; i < 17; i += 0.5) {
-  const hours = Math.floor(i).toString().padStart(2, '0');
-  const mins = i % 1 === 0 ? '00' : '30';
-  TIMES.push(`${hours}:${mins}`);
-}
-
-export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridProps) {
+export function AvailabilityGrid({ 
+  selectedSlots, 
+  onChange, 
+  startHour = 9, 
+  endHour = 17 
+}: AvailabilityGridProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove' | null>(null);
+
+  // --- NEW: Generate the times array dynamically based on the props ---
+  // We use useMemo so it only recalculates if the start/end hours actually change
+  const times = useMemo(() => {
+    const generatedTimes: string[] = [];
+    for (let i = startHour; i < endHour; i += 0.5) {
+      const hours = Math.floor(i).toString().padStart(2, '0');
+      const mins = i % 1 === 0 ? '00' : '30';
+      generatedTimes.push(`${hours}:${mins}`);
+    }
+    return generatedTimes;
+  }, [startHour, endHour]);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -65,7 +77,7 @@ export function AvailabilityGrid({ selectedSlots, onChange }: AvailabilityGridPr
           </div>
         ))}
 
-        {TIMES.map(time => (
+        {times.map(time => (
           <div style={{ display: 'contents' }} key={time}>
             <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingTop: '4px' }}>
               {time.endsWith(':00') ? format12Hour(time) : ''}

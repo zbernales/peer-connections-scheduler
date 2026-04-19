@@ -1,19 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Tutor, DayOfWeek } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
+// --- UPDATED: Added endHour to the props ---
 interface TutorScheduleGridProps {
   tutor: Tutor;
   selectedSlots: Set<string>; 
   onChange: (newSlots: Set<string>) => void; 
+  endHour?: number;
 }
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-
-const TIMES: string[] = [];
-for (let i = 9; i < 17; i += 0.5) {
-  TIMES.push(floatToTime(i));
-}
 
 function buildSlotSet(items: { day: string; startTime: string; endTime: string }[]) {
   const set = new Set<string>();
@@ -28,17 +25,37 @@ function buildSlotSet(items: { day: string; startTime: string; endTime: string }
   return set;
 }
 
-export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorScheduleGridProps) {
+export function TutorScheduleGrid({ tutor, selectedSlots, onChange, endHour = 17 }: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
+
+  // --- NEW: Generate times array dynamically based on endHour prop ---
+  const times = useMemo(() => {
+    const generatedTimes: string[] = [];
+    for (let i = 9; i < endHour; i += 0.5) {
+      generatedTimes.push(floatToTime(i));
+    }
+    return generatedTimes;
+  }, [endHour]);
 
   useEffect(() => {
     const handleMouseUp = () => setIsDragging(false);
     window.addEventListener('mouseup', handleMouseUp);
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, []);
+
+  // Moved updateCell up so it can be safely called by the handlers
+  const updateCell = (cellId: string, add: boolean) => {
+    const newSlots = new Set(selectedSlots);
+    if (add) {
+      newSlots.add(cellId);
+    } else {
+      newSlots.delete(cellId);
+    }
+    onChange(newSlots);
+  };
 
   const handleMouseDown = (cellId: string) => {
     setIsDragging(true);
@@ -51,16 +68,6 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorSched
     if (isDragging) {
       updateCell(cellId, isAdding);
     }
-  };
-
-  const updateCell = (cellId: string, add: boolean) => {
-    const newSlots = new Set(selectedSlots);
-    if (add) {
-      newSlots.add(cellId);
-    } else {
-      newSlots.delete(cellId);
-    }
-    onChange(newSlots);
   };
 
   return (
@@ -96,42 +103,68 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange }: TutorSched
           </div>
         ))}
 
-        {TIMES.map(time => (
-          <div style={{ display: 'contents' }} key={time}>
-            
-            {/* --- UPDATED: Only show the label if it is the top of the hour! --- */}
-            <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingTop: '4px' }}>
-              {time.endsWith(':00') ? format12Hour(time) : ''}
+        {times.map(time => {
+          const isNightStart = time === '17:00';
+
+          return (
+            <div style={{ display: 'contents' }} key={time}>
+    
+              {isNightStart && (
+                <div style={{
+                  gridColumn: '1 / -1', 
+                  height: '3px',
+                  backgroundColor: '#334155',
+                  marginTop: '0.75rem',
+                  marginBottom: '0.75rem', 
+                  borderRadius: '2px'
+                }} />
+              )}
+
+              {/* Sidebar Time Label */}
+              <div style={{ 
+                textAlign: 'right', 
+                paddingRight: '8px', 
+                fontSize: '0.85rem', 
+                color: isNightStart ? '#334155' : '#475569', 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'flex-end', 
+                justifyContent: 'flex-start', 
+                paddingTop: '4px',
+              }}>
+                {time.endsWith(':00') ? format12Hour(time) : ''}
+              </div>
+
+              {/* Grid Cells */}
+              {DAYS.map(day => {
+                const cellId = `${day}-${time}`;
+                const isScheduled = selectedSlots.has(cellId);
+                const isAvailable = availableSlots.has(cellId);
+
+                let bgColor = '#f1f5f9'; 
+                if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
+                else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
+                else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
+
+                return (
+                  <div
+                    key={cellId}
+                    onMouseDown={() => handleMouseDown(cellId)}
+                    onMouseEnter={() => handleMouseEnter(cellId)}
+                    title="Click and drag to toggle shift"
+                    style={{
+                      height: '24px',
+                      backgroundColor: bgColor,
+                      border: '1px solid #cbd5e1', // Reverted to uniform borders
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                    }}
+                  />
+                );
+              })}
             </div>
-
-            {DAYS.map(day => {
-              const cellId = `${day}-${time}`;
-              const isScheduled = selectedSlots.has(cellId);
-              const isAvailable = availableSlots.has(cellId);
-
-              let bgColor = '#f1f5f9'; 
-              if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
-              else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
-              else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
-
-              return (
-                <div
-                  key={cellId}
-                  onMouseDown={() => handleMouseDown(cellId)}
-                  onMouseEnter={() => handleMouseEnter(cellId)}
-                  title="Click and drag to toggle shift"
-                  style={{
-                    height: '24px',
-                    backgroundColor: bgColor,
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '2px',
-                    cursor: 'pointer',
-                  }}
-                />
-              );
-            })}
-          </div>
-        ))}
+          );
+        })}
       </div>
       <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', marginTop: '1rem' }}>
         * Click and drag to quickly paint or erase shifts for this tutor.

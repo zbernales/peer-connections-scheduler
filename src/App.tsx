@@ -106,7 +106,6 @@ function getMergedWeeklySchedule(weeklyShifts: any[]) {
   });
 }
 
-// --- Security Guard Wrapper for Admin Routes ---
 function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: React.ReactNode }) {
   if (!isAdmin) {
     return <Navigate to="/submit" replace />;
@@ -114,7 +113,6 @@ function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: Rea
   return <>{children}</>;
 }
 
-// --- Login Screen ---
 function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
   const [pin, setPin] = useState('');
   
@@ -144,7 +142,6 @@ function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
   );
 }
 
-// --- NEW: Collapsible Section Header ---
 function SectionHeader({ title, isOpen, onToggle }: { title: string, isOpen: boolean, onToggle: () => void }) {
   return (
     <div 
@@ -161,7 +158,7 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string, isOpen: boo
 
 function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: ScheduleConfig }) {
   const times: number[] = [];
-  for (let i = 9; i < 17; i += 0.5) {
+  for (let i = 9; i < 22; i += 0.5) {
     times.push(i);
   }
 
@@ -190,38 +187,51 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
             </tr>
           </thead>
           <tbody>
-            {times.map(t => (
-              <tr key={t}>
-                <td style={{ padding: '0.5rem', borderBottom: '1px solid #e2e8f0', fontWeight: 'bold', color: '#64748b', borderRight: '2px solid #e2e8f0' }}>
-                  {format12Hour(floatToTime(t))}
-                </td>
-                {DAYS.map(day => {
-                  const count = counts[`${day}-${t}`] || 0;
-                  
-                  const intensity = count / config.tutorsPerHour;
-                  
-                  const bgColor = count === 0 
-                    ? '#f8fafc' 
-                    : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
-                  
-                  const textColor = intensity > 0.6 ? 'white' : '#1e293b';
+            {times.map(t => {
+              const isNightStart = t === 17;
 
-                  return (
-                    <td key={day} style={{ 
-                      padding: '0.5rem', 
-                      borderBottom: '1px solid #e2e8f0',
-                      borderRight: '1px solid #e2e8f0',
-                      backgroundColor: bgColor,
-                      color: textColor,
-                      transition: 'background-color 0.2s',
-                      fontWeight: count > 0 ? 'bold' : 'normal'
-                    }}>
-                      {count > 0 ? count : '-'}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+              return (
+                <tr key={t}>
+                  <td style={{ 
+                    padding: '0.5rem', 
+                    borderBottom: '1px solid #e2e8f0', 
+                    fontWeight: 'bold', 
+                    color: '#64748b', 
+                    borderRight: '2px solid #e2e8f0',
+                    borderTop: isNightStart ? '3px solid #334155' : 'none', 
+                  }}>
+                    {format12Hour(floatToTime(t))}
+                  </td>
+                  {DAYS.map(day => {
+                    const count = counts[`${day}-${t}`] || 0;
+                    
+                    const activeCap = t >= 17 ? (config.maxTutorsPerNightShift || 2) : config.tutorsPerHour;
+                    const intensity = count / activeCap;
+                    
+                    const bgColor = count === 0 
+                      ? '#f8fafc' 
+                      : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
+                    
+                    const textColor = intensity > 0.6 ? 'white' : '#1e293b';
+
+                    return (
+                      <td key={day} style={{ 
+                        padding: '0.5rem', 
+                        borderBottom: '1px solid #e2e8f0',
+                        borderRight: '1px solid #e2e8f0',
+                        borderTop: isNightStart ? '3px solid #334155' : 'none', 
+                        backgroundColor: bgColor,
+                        color: textColor,
+                        transition: 'background-color 0.2s',
+                        fontWeight: count > 0 ? 'bold' : 'normal'
+                      }}>
+                        {count > 0 ? count : '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -288,6 +298,9 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
 function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: any) {
   const [draftSlots, setDraftSlots] = useState<Set<string>>(new Set());
 
+  const hasNightAvailability = tutor.availability.some((slot: any) => timeToFloat(slot.endTime) > 17);
+  const activeEndHour = hasNightAvailability ? 22 : 17; 
+
   useEffect(() => {
     const initialSet = new Set<string>();
     currentSchedule.forEach((shift: Shift) => {
@@ -337,7 +350,9 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
             </p>
           </div>
         </div>
-        <TutorScheduleGrid tutor={tutor} selectedSlots={draftSlots} onChange={setDraftSlots} />
+        
+        <TutorScheduleGrid tutor={tutor} selectedSlots={draftSlots} onChange={setDraftSlots} endHour={activeEndHour} />
+        
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
           <button onClick={handleSave} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>
           <button onClick={onClose} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '1rem', cursor: 'pointer' }}>Cancel</button>
@@ -366,12 +381,10 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
     <nav style={{ backgroundColor: '#1e293b', padding: '1rem', color: 'white', display: 'flex', gap: '1rem', alignItems: 'center', borderRadius: '0 0 8px 8px', marginBottom: '2rem' }}>
       <h2 style={{ margin: 0, marginRight: 'auto', color: 'white' }}>Peer Connections</h2>
       
-      {/* Student Link - Always visible */}
       <Link onClick={handleNavClick} to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
         Tutor Submission Form
       </Link>
       
-      {/* Admin Links - Only visible if logged in */}
       {isAdmin ? (
         <>
           <Link onClick={handleNavClick} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
@@ -385,7 +398,6 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
           </button>
         </>
       ) : (
-        // Login Link - Visible to public (subtle styling so students ignore it)
         <Link to="/login" style={{ textDecoration: 'none', padding: '0.5rem 1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
           Admin Login
         </Link>
@@ -420,7 +432,6 @@ function App() {
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
   const [activeRoster, setActiveRoster] = useState<Tutor[]>([]); 
 
-  // --- NEW: Toggle states for the 3 sections ---
   const [isTutorsOpen, setIsTutorsOpen] = useState(true);
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(true);
   const [isSubjectsOpen, setIsSubjectsOpen] = useState(true);
@@ -443,6 +454,10 @@ function App() {
   const [saveStatus, setSaveStatus] = useState<string>('');
 
   const [tutorSearchQuery, setTutorSearchQuery] = useState(''); 
+  // --- NEW: Filters for Tutor Breakdowns ---
+  const [tutorSubjectFilter, setTutorSubjectFilter] = useState('');
+  const [tutorNightFilter, setTutorNightFilter] = useState(false);
+
   const [subjectSearchQuery, setSubjectSearchQuery] = useState('');
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
 
@@ -452,6 +467,11 @@ function App() {
     setSchedule([]);
     setActiveRoster([]);
     setActiveScheduleMeta(null);
+    setTutorSearchQuery('');
+    setTutorSubjectFilter('');
+    setTutorNightFilter(false);
+    setSubjectSearchQuery('');
+    setExpandedDepartments(new Set());
   };
 
   useEffect(() => {
@@ -502,6 +522,14 @@ function App() {
     setActiveRoster(globalRoster); 
     setSelectedTutorModal(null);
     setActiveScheduleMeta(null); 
+    setTutorSearchQuery('');
+    setTutorSubjectFilter('');
+    setTutorNightFilter(false);
+    setSubjectSearchQuery('');
+    setExpandedDepartments(new Set());
+    setIsTutorsOpen(true);
+    setIsHeatmapOpen(true);
+    setIsSubjectsOpen(true);
   };
 
   const handleSaveTutorSchedule = (tutorId: string, newTutorShifts: Shift[]) => {
@@ -575,9 +603,14 @@ function App() {
     sub.toLowerCase().includes(subjectSearchQuery.toLowerCase())
   );
 
-  const filteredTutors = activeRoster.filter(tutor => 
-    tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase())
-  );
+  // --- UPDATED: Tutor filtering logic including Name, Subject, and Night Availability ---
+  const filteredTutors = activeRoster.filter(tutor => {
+    const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
+    const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
+    const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
+    const matchesNight = !tutorNightFilter || hasNightAvailability;
+    return matchesName && matchesSubject && matchesNight;
+  });
 
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
@@ -618,10 +651,17 @@ function App() {
                 setActiveRoster(loadedRoster && loadedRoster.length > 0 ? loadedRoster : globalRoster);
                 setSelectedTutorModal(null);
                 setActiveScheduleMeta({ id, name }); 
+                setTutorSearchQuery('');
+                setTutorSubjectFilter('');
+                setTutorNightFilter(false);
+                setSubjectSearchQuery('');
+                setExpandedDepartments(new Set());
+                setIsTutorsOpen(true);
+                setIsHeatmapOpen(true);
+                setIsSubjectsOpen(true);
               }} />
             </ProtectedRoute>
           } />
-
           <Route path="/schedule" element={
             <ProtectedRoute isAdmin={isAdmin}>
               <>
@@ -669,19 +709,38 @@ function App() {
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
 
-                {/* --- COLLAPSIBLE SECTION 1: Tutor Breakdowns --- */}
                 <SectionHeader title="Tutor Breakdowns" isOpen={isTutorsOpen} onToggle={() => setIsTutorsOpen(!isTutorsOpen)} />
                 
                 {isTutorsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    {/* --- NEW: Expanded Filter Controls --- */}
+                    <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       <input 
                         type="text" 
                         placeholder="🔍 Search for a specific tutor..." 
                         value={tutorSearchQuery}
                         onChange={(e) => setTutorSearchQuery(e.target.value)}
-                        style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        style={{ flex: 1, minWidth: '250px', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                       />
+                      <select
+                        value={tutorSubjectFilter}
+                        onChange={(e) => setTutorSubjectFilter(e.target.value)}
+                        style={{ padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', backgroundColor: 'white', minWidth: '200px' }}
+                      >
+                        <option value="">All Subjects</option>
+                        {allSubjects.map(sub => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </select>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input
+                          type="checkbox"
+                          checked={tutorNightFilter}
+                          onChange={(e) => setTutorNightFilter(e.target.checked)}
+                          style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+                        />
+                        Available at Night
+                      </label>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
@@ -761,7 +820,7 @@ function App() {
                           );
                         })
                       ) : (
-                        <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No tutors match your search.</p>
+                        <p style={{ color: '#64748b', fontStyle: 'italic', gridColumn: '1 / -1' }}>No tutors match your search criteria.</p>
                       )}
                     </div>
                   </div>
@@ -769,7 +828,6 @@ function App() {
                 
                 <hr style={{ margin: '3rem 0' }} />
 
-                {/* --- COLLAPSIBLE SECTION 2: Coverage Heat Map --- */}
                 <SectionHeader title="Coverage Heat Map" isOpen={isHeatmapOpen} onToggle={() => setIsHeatmapOpen(!isHeatmapOpen)} />
                 
                 {isHeatmapOpen && (
@@ -784,7 +842,6 @@ function App() {
 
                 <hr style={{ margin: '3rem 0' }} />
 
-                {/* --- COLLAPSIBLE SECTION 3: Subject Coverage --- */}
                 <SectionHeader title="Subject Coverage" isOpen={isSubjectsOpen} onToggle={() => setIsSubjectsOpen(!isSubjectsOpen)} />
 
                 {isSubjectsOpen && (
@@ -858,17 +915,29 @@ function App() {
                   />
                 )}
 
-                {selectedSubjectModal && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                    <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <h2 style={{ margin: 0 }}>📚 {selectedSubjectModal} Coverage</h2>
-                        <button onClick={() => setSelectedSubjectModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
+                {selectedSubjectModal && (() => {
+                  const subjectShiftsForModal = schedule.filter(s => s.subjects.includes(selectedSubjectModal));
+                  const hasNightShifts = subjectShiftsForModal.some(s => timeToFloat(s.endTime) > 17);
+                  const activeSubjectEndHour = hasNightShifts ? 22 : 17;
+
+                  return (
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                      <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                          <h2 style={{ margin: 0 }}>📚 {selectedSubjectModal} Coverage</h2>
+                          <button onClick={() => setSelectedSubjectModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
+                        </div>
+                        
+                        <SubjectScheduleGrid 
+                          subject={selectedSubjectModal} 
+                          shifts={subjectShiftsForModal} 
+                          roster={activeRoster} 
+                          endHour={activeSubjectEndHour} 
+                        />
                       </div>
-                      <SubjectScheduleGrid subject={selectedSubjectModal} shifts={schedule.filter(s => s.subjects.includes(selectedSubjectModal))} roster={activeRoster} />
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
               </>
             </ProtectedRoute>

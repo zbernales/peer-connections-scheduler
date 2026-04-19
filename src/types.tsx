@@ -31,4 +31,6 @@ export interface ScheduleConfig {
   maxHoursPerDay: number;
   minHoursPerShift: number;
   maxHoursPerWeek?: number;
+  autoScheduleNightHours?: boolean;
+  maxTutorsPerNightShift?: number;
 }

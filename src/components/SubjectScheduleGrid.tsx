@@ -1,22 +1,28 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Shift, DayOfWeek, Tutor } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
+// --- NEW: Added endHour to props ---
 interface SubjectScheduleGridProps {
   subject: string;
   shifts: Shift[];
   roster: Tutor[];
+  endHour?: number;
 }
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-const TIMES: string[] = [];
-for (let i = 9; i < 17; i += 0.5) {
-  TIMES.push(floatToTime(i));
-}
-
-export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps) {
+export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+
+  // --- NEW: Dynamically generate the times array based on the endHour prop ---
+  const times = useMemo(() => {
+    const generatedTimes: string[] = [];
+    for (let i = 9; i < endHour; i += 0.5) {
+      generatedTimes.push(floatToTime(i));
+    }
+    return generatedTimes;
+  }, [endHour]);
 
   const coverageMap = new Map<string, string[]>();
 
@@ -65,55 +71,86 @@ export function SubjectScheduleGrid({ shifts, roster }: SubjectScheduleGridProps
           </div>
         ))}
 
-        {TIMES.map(time => (
-          <div style={{ display: 'contents' }} key={time}>
-            <div style={{ textAlign: 'right', paddingRight: '8px', fontSize: '0.85rem', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-              {time.endsWith(':00') ? format12Hour(time) : ''}
+        {/* --- UPDATED: Using the dynamic times array --- */}
+        {times.map(time => {
+          // Identify the 5:00 PM boundary
+          const isNightStart = time === '17:00';
+
+          return (
+            <div style={{ display: 'contents' }} key={time}>
+              
+              {/* --- NEW: The Solid Spanning Divider --- */}
+              {isNightStart && (
+                <div style={{
+                  gridColumn: '1 / -1', 
+                  height: '3px',
+                  backgroundColor: '#334155',
+                  marginTop: '0.75rem',
+                  marginBottom: '0.75rem', // Extra gap underneath!
+                  borderRadius: '2px'
+                }} />
+              )}
+
+              {/* Sidebar Time Label */}
+              <div style={{ 
+                textAlign: 'right', 
+                paddingRight: '8px', 
+                fontSize: '0.85rem', 
+                color: isNightStart ? '#334155' : '#475569', 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'flex-end', 
+                justifyContent: 'flex-start', 
+                paddingTop: '4px',
+              }}>
+                {time.endsWith(':00') ? format12Hour(time) : ''}
+              </div>
+
+              {/* Grid Cells */}
+              {DAYS.map(day => {
+                const cellId = `${day}-${time}`;
+                const tutorsHere = coverageMap.get(cellId) || [];
+                const isCovered = tutorsHere.length > 0;
+
+                return (
+                  <div
+                    key={cellId}
+                    onMouseEnter={() => setHoveredCell(cellId)}
+                    onMouseLeave={() => setHoveredCell(null)}
+                    style={{
+                      height: '24px',
+                      backgroundColor: isCovered ? '#10b981' : '#f1f5f9', 
+                      border: '1px solid #cbd5e1', // Reverted to uniform borders
+                      borderRadius: '2px',
+                      position: 'relative', 
+                      cursor: isCovered ? 'pointer' : 'default'
+                    }}
+                  >
+                    {hoveredCell === cellId && isCovered && (
+                      <div style={{ 
+                        position: 'absolute', 
+                        bottom: '120%', 
+                        left: '50%', 
+                        transform: 'translateX(-50%)', 
+                        backgroundColor: '#1e293b', 
+                        color: 'white', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px', 
+                        fontSize: '0.75rem', 
+                        whiteSpace: 'nowrap',
+                        zIndex: 50,
+                        pointerEvents: 'none', 
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {tutorsHere.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-
-            {DAYS.map(day => {
-              const cellId = `${day}-${time}`;
-              const tutorsHere = coverageMap.get(cellId) || [];
-              const isCovered = tutorsHere.length > 0;
-
-              return (
-                <div
-                  key={cellId}
-                  onMouseEnter={() => setHoveredCell(cellId)}
-                  onMouseLeave={() => setHoveredCell(null)}
-                  style={{
-                    height: '24px',
-                    backgroundColor: isCovered ? '#10b981' : '#f1f5f9', // Emerald Green for coverage
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '2px',
-                    position: 'relative', // Critical for the tooltip to attach correctly
-                    cursor: isCovered ? 'pointer' : 'default'
-                  }}
-                >
-                  {hoveredCell === cellId && isCovered && (
-                    <div style={{ 
-                      position: 'absolute', 
-                      bottom: '120%', 
-                      left: '50%', 
-                      transform: 'translateX(-50%)', 
-                      backgroundColor: '#1e293b', 
-                      color: 'white', 
-                      padding: '4px 8px', 
-                      borderRadius: '4px', 
-                      fontSize: '0.75rem', 
-                      whiteSpace: 'nowrap',
-                      zIndex: 50,
-                      pointerEvents: 'none', 
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                    }}>
-                      {tutorsHere.join(', ')}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

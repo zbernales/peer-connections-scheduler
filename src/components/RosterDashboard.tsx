@@ -4,7 +4,6 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor, ScheduleConfig } from '../types';
 import { useState } from 'react';
-//import { seedDatabase } from '../utils/seedData';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -17,6 +16,9 @@ interface RosterDashboardProps {
 export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor, onGenerate }: RosterDashboardProps) { 
   const navigate = useNavigate();
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
+  
+  // --- NEW: State for the search query ---
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleDelete = async (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
@@ -40,10 +42,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
 
     if (window.confirm(confirmMessage)) {
       try {
-        // Create an array of delete promises for every tutor in the roster
         const deletePromises = roster.map(tutor => deleteDoc(doc(db, 'tutors', tutor.id)));
-        
-        // Wait for all deletions to finish
         await Promise.all(deletePromises);
         alert("Roster successfully reset.");
       } catch (error) {
@@ -63,6 +62,11 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
     }
   };
 
+  // --- NEW: Filter the roster based on the search query ---
+  const filteredRoster = roster.filter(tutor => 
+    tutor.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
       
@@ -77,24 +81,40 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         >
           Generate Schedule
         </button>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-  
-        {/* --- Temporary Seeding Button --- 
-        <button 
-          onClick={() => {
-            if (window.confirm("WARNING: This will add 30 fake tutors to your live database. Proceed?")) {
-              seedDatabase(30);
-            }
-          }} 
-          style={{ padding: '0.75rem 7rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-        >
-          Inject 30 Fake Tutors
-        </button> */}
-
-      </div>
-
+        
         <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <h3 style={{ marginTop: 0 }}>⚙️ Algorithm Settings</h3>
+
+          <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', marginBottom: config.autoScheduleNightHours ? '1rem' : '0' }}>
+              <input 
+                type="checkbox" 
+                checked={config.autoScheduleNightHours || false} 
+                onChange={e => onConfigChange({
+                  ...config, 
+                  autoScheduleNightHours: e.target.checked,
+                  maxTutorsPerNightShift: config.maxTutorsPerNightShift || 2 
+                })} 
+                style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', marginTop: '2px' }}
+              />
+              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule night hours (5 PM - 10 PM)</strong>
+            </label>
+
+            {config.autoScheduleNightHours && (
+              <div style={{ paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: '#475569' }}>
+                  Max Tutors Per Night Shift
+                </label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  value={config.maxTutorsPerNightShift || 2} 
+                  onChange={e => onConfigChange({...config, maxTutorsPerNightShift: Number(e.target.value)})} 
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
+                />
+              </div>
+            )}
+          </div>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Week</label>
@@ -104,18 +124,18 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
               step="0.5" 
               value={config.maxHoursPerWeek || 6} 
               onChange={e => onConfigChange({...config, maxHoursPerWeek: Number(e.target.value)})} 
-              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
             />
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
-            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Consecutive Hours</label>
-            <input type="number" min="0.5" step="0.5" value={config.maxConsecutiveHours} onChange={e => onConfigChange({...config, maxConsecutiveHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+            <input type="number" min="0.5" step="0.5" value={config.maxConsecutiveHours} onChange={e => onConfigChange({...config, maxConsecutiveHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
@@ -126,18 +146,18 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
               step="0.5" 
               value={config.minHoursPerShift || 0.5} 
               onChange={e => onConfigChange({...config, minHoursPerShift: Number(e.target.value)})} 
-              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} 
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
             />
           </div>
           
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Cooldown Hours (Gap Between Shifts)</label>
-            <input type="number" min="0.5" step="0.5" value={config.minCooldownHours} onChange={e => onConfigChange({...config, minCooldownHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+            <input type="number" min="0.5" step="0.5" value={config.minCooldownHours} onChange={e => onConfigChange({...config, minCooldownHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Tutors per Hour</label>
-            <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Tutors per Hour (Daytime)</label>
+            <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
           </div>
 
         </div>
@@ -148,7 +168,6 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2 style={{ margin: 0 }}>Tutor Roster ({roster.length})</h2>
           
-          {/* --- UPDATED BUTTON GROUP --- */}
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button 
               onClick={handleResetRoster} 
@@ -165,8 +184,28 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
           </div>
         </div>
 
+        {/* --- NEW: Search Input Field --- */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <input 
+            type="text" 
+            placeholder="🔍 Search tutors by name..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ 
+              width: '100%', 
+              padding: '0.75rem 1rem', 
+              borderRadius: '8px', 
+              border: '1px solid #cbd5e1', 
+              fontSize: '1.05rem', 
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}
+          />
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {roster.map(tutor => (
+          {/* --- UPDATED: Map over filteredRoster instead of roster --- */}
+          {filteredRoster.map(tutor => (
             <div 
               key={tutor.id} 
               onClick={() => onSelectTutor(tutor)}
@@ -195,7 +234,14 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
               </div>
             </div>
           ))}
-          {roster.length === 0 && <p style={{ color: '#64748b' }}>No tutors found. Click "+ Add Tutor" to get started.</p>}
+
+          {/* --- UPDATED: Empty state messages --- */}
+          {roster.length === 0 && (
+            <p style={{ color: '#64748b' }}>No tutors found. Click "+ Add Tutor" to get started.</p>
+          )}
+          {roster.length > 0 && filteredRoster.length === 0 && (
+            <p style={{ color: '#64748b', fontStyle: 'italic' }}>No tutors match your search for "{searchQuery}".</p>
+          )}
         </div>
       </div>
       

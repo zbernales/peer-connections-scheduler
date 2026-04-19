@@ -2,7 +2,6 @@ import type { Tutor, Shift, DayOfWeek, ScheduleConfig } from '../types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const START_HOUR = 9;  // 9.0 = 9:00 AM
-const END_HOUR = 19;   // 19.0 = 7:00 PM
 
 export function timeToFloat(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -53,6 +52,9 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
   
   const globalMaxWeekly = config.maxHoursPerWeek || 40; 
   
+  // NEW: Calculate the dynamic end hour for the algorithm
+  const activeEndHour = config.autoScheduleNightHours ? 22 : 17; // 10:00 PM or 5:00 PM
+  
   // Calculate Availability Scarcity per Tutor
   const tutorTotalAvailability: Record<string, number> = {};
   tutors.forEach(tutor => {
@@ -63,7 +65,7 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     tutorTotalAvailability[tutor.id] = totalHours;
   });
 
-  //Calculate the "Hardest Day" (Total availability pool per day)
+  // Calculate the "Hardest Day" (Total availability pool per day)
   const dailyAvailabilityScore: Record<string, number> = {
     Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0
   };
@@ -75,7 +77,7 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     });
   });
 
-  // 3.Sort the days from least available (hardest) to most available (easiest)
+  // Sort the days from least available (hardest) to most available (easiest)
   const sortedDays = [...DAYS].sort((a, b) => dailyAvailabilityScore[a] - dailyAvailabilityScore[b]);
 
   for (const day of sortedDays) {
@@ -89,7 +91,8 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       hoursAssignedToday[t.id] = 0;
     });
 
-    for (let timeSlot = START_HOUR; timeSlot < END_HOUR; timeSlot += 0.5) {
+    // UPDATED: Loop now terminates at the dynamic activeEndHour
+    for (let timeSlot = START_HOUR; timeSlot < activeEndHour; timeSlot += 0.5) {
       
       let eligibleTutors = tutors.filter(tutor => {
         const actualMax = Math.min(tutor.maxHours, globalMaxWeekly);
@@ -115,7 +118,8 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
 
           for (let i = 1; i < minShiftSlots; i++) { 
             const futureSlot = timeSlot + (i * 0.5);
-            if (futureSlot >= END_HOUR || !isAvailable(tutor, day, futureSlot)) {
+            // UPDATED: Lookahead constraint now respects the dynamic end hour
+            if (futureSlot >= activeEndHour || !isAvailable(tutor, day, futureSlot)) {
               return false;
             }
           }
@@ -127,7 +131,12 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       let tutorsScheduledThisSlot = 0;
       const scheduledThisBlock = new Set<string>();
 
-      while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < config.tutorsPerHour) {
+      // NEW: Dynamically determine the maximum tutors allowed for this specific time block
+      const currentCap = timeSlot >= 17 
+        ? (config.maxTutorsPerNightShift || 2) // If it's 5PM or later, use the night cap
+        : config.tutorsPerHour;                // Otherwise use the standard daytime cap
+
+      while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < currentCap) {
         
         eligibleTutors.sort((a, b) => {
           // PRIORITY 1: SHIFT MOMENTUM

@@ -18,22 +18,35 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
   const [minHours, setMinHours] = useState<number>(initialData?.minHours || 2);
   const [maxHours, setMaxHours] = useState<number>(initialData?.maxHours || 6);
   
-  // NEW: State to track if the night grid should be shown
-  const [canTutorAtNight, setCanTutorAtNight] = useState(false);
+  const initiallyHasNightAvailability = initialData?.availability?.some(slot => timeToFloat(slot.endTime) > 17) || false;
+  const [canTutorAtNight, setCanTutorAtNight] = useState(initiallyHasNightAvailability);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const defaultSlots = new Set<string>();
+
   if (initialData?.availability) {
     initialData.availability.forEach(slot => {
       let current = timeToFloat(slot.startTime);
       const end = timeToFloat(slot.endTime);
-
       while (current < end) {
         defaultSlots.add(`${slot.day}-${floatToTime(current)}`);
         current += 0.5;
       }
     });
   }
+
+  if ((initialData as any)?.disabledNightAvailability) {
+    (initialData as any).disabledNightAvailability.forEach((slot: TimeSlot) => {
+      let current = timeToFloat(slot.startTime);
+      const end = timeToFloat(slot.endTime);
+      while (current < end) {
+        defaultSlots.add(`${slot.day}-${floatToTime(current)}`);
+        current += 0.5;
+      }
+    });
+  }
+
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(defaultSlots);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,10 +64,13 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
     setIsSubmitting(true);
 
-    const availability: TimeSlot[] = Array.from(selectedSlots).map(slotId => {
+    const activeAvailability: TimeSlot[] = [];
+    const disabledNightAvailability: TimeSlot[] = [];
+
+    Array.from(selectedSlots).forEach(slotId => {
       const [day, startTime] = slotId.split('-'); 
-      
       const [hours, mins] = startTime.split(':').map(Number);
+      
       let endHours = hours;
       let endMins = mins + 30;
       if (endMins === 60) {
@@ -63,25 +79,34 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       }
       const endTime = `${endHours.toString().padStart(2, '0')}:${endMins === 0 ? '00' : '30'}`;
 
-      return {
+      const slot = {
         day: day as DayOfWeek,
         startTime,
         endTime
       };
+
+      if (!canTutorAtNight && hours >= 17) {
+        disabledNightAvailability.push(slot);
+      } else {
+        activeAvailability.push(slot);
+      }
     });
 
-    const newTutor: Tutor = {
+    const tutorData = {
       id: initialData?.id || crypto.randomUUID(), 
       name,
       subjects: selectedSubjects,
       minHours,
       maxHours,
-      availability
+      availability: activeAvailability,
+      disabledNightAvailability 
     };
 
     try {
-      await setDoc(doc(db, 'tutors', newTutor.id), newTutor);
-      onSubmit(newTutor);
+      await setDoc(doc(db, 'tutors', tutorData.id), tutorData);
+      
+      // Cast to unknown then Tutor to prevent strict TypeScript errors on the new property
+      onSubmit(tutorData as unknown as Tutor);
 
       if (!initialData) {
         setName('');
@@ -89,7 +114,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
         setSelectedSlots(new Set());
         setMinHours(2);
         setMaxHours(6);
-        setCanTutorAtNight(false); // Reset the toggle
+        setCanTutorAtNight(false);
       }
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -163,11 +188,10 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       <AvailabilityGrid 
         selectedSlots={selectedSlots} 
         onChange={setSelectedSlots} 
-        startHour={9}  // Starts at 9:00 AM
-        endHour={17}   // Ends at 5:00 PM
+        startHour={9}  
+        endHour={17}   
       />
 
-      {/* --- NEW: Night Tutoring Block --- */}
       <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
           <input 
@@ -176,7 +200,9 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
             onChange={(e) => setCanTutorAtNight(e.target.checked)} 
             style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
           />
-          <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>I am available to tutor at night (5:00 PM - 10:00 PM)</strong>
+          <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>
+            I am available to tutor at night (5:00 PM - 10:00 PM)
+          </strong>
         </label>
 
         {canTutorAtNight && (
@@ -185,13 +211,12 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
             <AvailabilityGrid 
               selectedSlots={selectedSlots} 
               onChange={setSelectedSlots} 
-              startHour={17} // Starts at 5:00 PM
-              endHour={22}   // Ends at 10:00 PM
+              startHour={17} 
+              endHour={22}   
             />
           </div>
         )}
       </div>
-      {/* --------------------------------- */}
 
       <br />
       

@@ -1,5 +1,5 @@
 import { db } from '../firebase'; // Adjust path to your firebase config
-import { collection, doc, setDoc, deleteDoc, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 
 export interface Course {
   id: string; // Used as the course code (e.g., "MATH-31")

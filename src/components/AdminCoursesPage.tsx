@@ -263,13 +263,12 @@ export const AdminCoursesPage: React.FC = () => {
       {courses.length === 0 && (
         <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
           <h3 style={{ marginTop: 0, color: '#166534' }}>Empty Database Detected</h3>
-          <p style={{ color: '#15803d', marginBottom: '1rem' }}>It looks like your course catalog is empty. You can instantly populate it with your 150+ hardcoded default classes.</p>
           <button 
             onClick={handleSeedDatabase} 
             disabled={submitting} 
             style={{ padding: '0.75rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
           >
-            {submitting ? 'Seeding Database...' : '🌱 Seed Initial Courses'}
+            {submitting ? 'Seeding Database...' : 'Seed Initial Courses'}
           </button>
         </div>
       )}

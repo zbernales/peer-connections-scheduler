@@ -134,15 +134,18 @@ export const AdminCoursesPage: React.FC = () => {
   const [department, setDepartment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null); // NEW: Error tracking
 
   // Load courses on component mount
   const fetchCourses = async () => {
     try {
       setLoading(true);
+      setFetchError(null); // Reset error on new fetch
       const data = await getAllCourses();
       setCourses(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching courses:", error);
+      setFetchError(error.message || "An unknown error occurred while fetching courses.");
     } finally {
       setLoading(false);
     }
@@ -220,11 +223,22 @@ export const AdminCoursesPage: React.FC = () => {
     }
   };
 
-  if (loading) return <div>Loading course catalog...</div>;
+  if (loading) return <div style={{ padding: '2rem' }}>Loading course catalog...</div>;
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h2>Course Catalog Management</h2>
+
+      {/* NEW: Explicit Error Display */}
+      {fetchError && (
+        <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#991b1b' }}>
+          <h3 style={{ marginTop: 0 }}>⚠️ Database Access Denied</h3>
+          <p><strong>Error details:</strong> {fetchError}</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+            <strong>How to fix:</strong> Go to the Firebase Console &rarr; Firestore Database &rarr; Rules. Make sure you have a rule allowing read access to the `courses` collection!
+          </p>
+        </div>
+      )}
       
       {/* Add Course Form */}
       <form onSubmit={handleAddCourse} style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -259,10 +273,11 @@ export const AdminCoursesPage: React.FC = () => {
         </button>
       </form>
 
-      {/* Seed Button (Only shows if DB is empty to prevent clutter/accidents) */}
-      {courses.length === 0 && (
+      {/* Seed Button (Only shows if DB is empty and there's no fetch error) */}
+      {courses.length === 0 && !fetchError && (
         <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
           <h3 style={{ marginTop: 0, color: '#166534' }}>Empty Database Detected</h3>
+          <p style={{ color: '#15803d', marginBottom: '1rem' }}>It looks like your course catalog is empty. You can instantly populate it with your 150+ hardcoded default classes.</p>
           <button 
             onClick={handleSeedDatabase} 
             disabled={submitting} 
@@ -275,9 +290,9 @@ export const AdminCoursesPage: React.FC = () => {
 
       {/* Courses List */}
       <h3>Active Courses ({courses.length})</h3>
-      {courses.length === 0 ? (
+      {courses.length === 0 && !fetchError ? (
         <p>No courses currently in the catalog.</p>
-      ) : (
+      ) : courses.length > 0 ? (
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
           <thead style={{ backgroundColor: '#f8fafc' }}>
             <tr>
@@ -309,7 +324,7 @@ export const AdminCoursesPage: React.FC = () => {
             ))}
           </tbody>
         </table>
-      )}
+      ) : null}
     </div>
   );
 };

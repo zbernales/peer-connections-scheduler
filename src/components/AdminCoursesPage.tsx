@@ -136,6 +136,11 @@ export const AdminCoursesPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null); // NEW: Error tracking
 
+  // --- NEW: Search, Filter, and Edit State ---
+  const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   // Load courses on component mount
   const fetchCourses = async () => {
     try {
@@ -155,32 +160,49 @@ export const AdminCoursesPage: React.FC = () => {
     fetchCourses();
   }, []);
 
-  const handleAddCourse = async (e: React.FormEvent) => {
+  const handleSubmitCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseCode || !courseName) return;
 
     try {
       setSubmitting(true);
-      const newCourse: Course = {
+      const courseData: Course = {
         id: courseCode,
         name: courseName,
         department: department || 'General'
       };
       
-      await saveCourse(newCourse);
+      await saveCourse(courseData);
       
       // Reset form options
       setCourseCode('');
       setCourseName('');
       setDepartment('');
+      setEditingId(null);
       
       // Refresh list
       await fetchCourses();
     } catch (error) {
-      console.error("Error adding course:", error);
+      console.error("Error saving course:", error);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditClick = (course: Course) => {
+    setCourseCode(course.id);
+    setCourseName(course.name);
+    setDepartment(course.department);
+    setEditingId(course.id);
+    // Scroll to top smoothly so admin easily sees the form changed
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setCourseCode('');
+    setCourseName('');
+    setDepartment('');
+    setEditingId(null);
   };
 
   const handleDeleteCourse = async (id: string) => {
@@ -225,6 +247,16 @@ export const AdminCoursesPage: React.FC = () => {
 
   if (loading) return <div style={{ padding: '2rem' }}>Loading course catalog...</div>;
 
+  // --- NEW: Filter Logic ---
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = course.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          course.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDept = departmentFilter === '' || course.department === departmentFilter;
+    return matchesSearch && matchesDept;
+  });
+
+  const uniqueDepartments = Array.from(new Set(courses.map(c => c.department))).sort();
+
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h2>Course Catalog Management</h2>
@@ -240,38 +272,71 @@ export const AdminCoursesPage: React.FC = () => {
         </div>
       )}
       
-      {/* Add Course Form */}
-      <form onSubmit={handleAddCourse} style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+      {/* Add / Edit Course Form */}
+      <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+        <h3 style={{ marginTop: 0, color: '#1e293b' }}>
+          {editingId ? `Editing Course: ${editingId}` : 'Add New Course'}
+        </h3>
+        <form onSubmit={handleSubmitCourse} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input 
+            type="text" 
+            placeholder="Course Code (e.g., CS-146)" 
+            value={courseCode}
+            onChange={(e) => setCourseCode(e.target.value)}
+            required
+            disabled={submitting || editingId !== null}
+            style={{ padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', flex: '1 1 200px', backgroundColor: editingId ? '#f1f5f9' : 'white', cursor: editingId ? 'not-allowed' : 'text' }}
+          />
+          <input 
+            type="text" 
+            placeholder="Course Name (e.g., Data Structures)" 
+            value={courseName}
+            onChange={(e) => setCourseName(e.target.value)}
+            required
+            disabled={submitting}
+            style={{ padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', flex: '1 1 250px' }}
+          />
+          <input 
+            type="text" 
+            placeholder="Department (Optional)" 
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            disabled={submitting}
+            style={{ padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', flex: '1 1 200px' }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="submit" disabled={submitting} style={{ padding: '0.75rem 1.5rem', backgroundColor: editingId ? '#f59e0b' : '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              {submitting ? 'Working...' : editingId ? 'Update Course' : 'Add Course'}
+            </button>
+            {editingId && (
+              <button type="button" onClick={handleCancelEdit} disabled={submitting} style={{ padding: '0.75rem 1rem', backgroundColor: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* NEW: Search and Filter Controls */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <input 
           type="text" 
-          placeholder="Course Code (e.g., CS-146)" 
-          value={courseCode}
-          onChange={(e) => setCourseCode(e.target.value)}
-          required
-          disabled={submitting}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+          placeholder="🔍 Search by code or name..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ flex: '1 1 300px', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem' }}
         />
-        <input 
-          type="text" 
-          placeholder="Course Name (e.g., Data Structures)" 
-          value={courseName}
-          onChange={(e) => setCourseName(e.target.value)}
-          required
-          disabled={submitting}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-        />
-        <input 
-          type="text" 
-          placeholder="Department (Optional)" 
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          disabled={submitting}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-        />
-        <button type="submit" disabled={submitting} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          {submitting ? 'Working...' : 'Add Course'}
-        </button>
-      </form>
+        <select 
+          value={departmentFilter}
+          onChange={(e) => setDepartmentFilter(e.target.value)}
+          style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', backgroundColor: 'white', minWidth: '200px' }}
+        >
+          <option value="">All Departments</option>
+          {uniqueDepartments.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Seed Button (Only shows if DB is empty and there's no fetch error) */}
       {courses.length === 0 && !fetchError && (
@@ -289,7 +354,13 @@ export const AdminCoursesPage: React.FC = () => {
       )}
 
       {/* Courses List */}
-      <h3>Active Courses ({courses.length})</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0 }}>Active Courses ({filteredCourses.length})</h3>
+        {courses.length !== filteredCourses.length && (
+          <span style={{ fontSize: '0.9rem', color: '#64748b' }}>Showing {filteredCourses.length} of {courses.length} total</span>
+        )}
+      </div>
+
       {courses.length === 0 && !fetchError ? (
         <p>No courses currently in the catalog.</p>
       ) : courses.length > 0 ? (
@@ -303,8 +374,8 @@ export const AdminCoursesPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {courses.map(course => (
-              <tr key={course.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+            {filteredCourses.map(course => (
+              <tr key={course.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: editingId === course.id ? '#fef3c7' : 'transparent' }}>
                 <td style={{ padding: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{course.id}</td>
                 <td style={{ padding: '1rem', color: '#475569' }}>{course.name}</td>
                 <td style={{ padding: '1rem', color: '#475569' }}>
@@ -312,16 +383,30 @@ export const AdminCoursesPage: React.FC = () => {
                     {course.department}
                   </span>
                 </td>
-                <td style={{ padding: '1rem' }}>
+                <td style={{ padding: '1rem', display: 'flex', gap: '0.75rem' }}>
+                  <button 
+                    onClick={() => handleEditClick(course)}
+                    style={{ color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Edit
+                  </button>
                   <button 
                     onClick={() => handleDeleteCourse(course.id)}
                     style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                    disabled={editingId === course.id} // Disable delete while actively editing this row
                   >
                     Remove
                   </button>
                 </td>
               </tr>
             ))}
+            {filteredCourses.length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  No courses match your search or filter criteria.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       ) : null}

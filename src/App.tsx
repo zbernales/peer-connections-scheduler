@@ -8,6 +8,7 @@ import { collection, onSnapshot, addDoc, updateDoc, doc } from 'firebase/firesto
 import { db } from './firebase';
 import { TutorScheduleGrid } from './components/TutorScheduleGrid';
 import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
+import { AdminCoursesPage } from './components/AdminCoursesPage';
 import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -393,6 +394,10 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
           <Link onClick={handleNavClick} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
             Saved Schedules
           </Link>
+          {/* --- NEW: Course Catalog Button --- */}
+          <Link onClick={handleNavClick} to="/courses" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/courses' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+            Course Catalog
+          </Link>
           <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
             Lock App
           </button>
@@ -627,6 +632,15 @@ function App() {
               }} />
             </div>
           } />
+
+          {/* --- NEW: Course Catalog Route --- */}
+          <Route path="/courses" element={
+            <ProtectedRoute isAdmin={isAdmin}>
+              <AdminCoursesPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="*" element={<Navigate to="/submit" replace />} />
 
           <Route path="/login" element={
             isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />

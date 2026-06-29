@@ -280,7 +280,7 @@ export const AdminCoursesPage: React.FC = () => {
         <form onSubmit={handleSubmitCourse} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <input 
             type="text" 
-            placeholder="Course Code (e.g., CS-146)" 
+            placeholder="Course Code (e.g., CS 46B)" 
             value={courseCode}
             onChange={(e) => setCourseCode(e.target.value)}
             required
@@ -289,7 +289,7 @@ export const AdminCoursesPage: React.FC = () => {
           />
           <input 
             type="text" 
-            placeholder="Course Name (e.g., Data Structures)" 
+            placeholder="Course Name (e.g., Introduction to Data Structures)" 
             value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
             required

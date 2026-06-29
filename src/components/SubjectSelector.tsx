@@ -67,6 +67,8 @@ export function SubjectSelector({ selectedSubjects, onChange }: SubjectSelectorP
     if (e.key === 'Enter') {
       e.preventDefault(); // Stop the form from submitting!
       
+      /*
+      // --- CUSTOM COURSE FEATURE TEMPORARILY DISABLED ---
       const customCourse = searchTerm.trim().toUpperCase();
       
       if (customCourse && !selectedSubjects.includes(customCourse)) {
@@ -74,6 +76,8 @@ export function SubjectSelector({ selectedSubjects, onChange }: SubjectSelectorP
       } else if (selectedSubjects.includes(customCourse)) {
         setSearchTerm(''); // Clear the input if they try to add a duplicate
       }
+      // --------------------------------------------------
+      */
     }
   };
 
@@ -136,7 +140,7 @@ export function SubjectSelector({ selectedSubjects, onChange }: SubjectSelectorP
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
-          placeholder={isLoading ? "Loading courses..." : selectedSubjects.length === 0 ? "Search courses or type a custom one and press Enter (e.g., CS 46B or BUS1 120A)" : ""}
+          placeholder={isLoading ? "Loading courses..." : selectedSubjects.length === 0 ? "Search courses... (e.g., CS 146)" : ""}
           style={{ 
             border: 'none', 
             outline: 'none', 

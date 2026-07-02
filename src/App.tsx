@@ -307,14 +307,32 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
     slot.day === 'Saturday' || slot.day === 'Sunday'
   );
 
-  // State to control what the admin sees (defaults to the tutor's actual availability)
-  const [showNight, setShowNight] = useState(initiallyHasNight);
-  const [showWeekend, setShowWeekend] = useState(initiallyHasWeekend);
+  // --- UPDATED: Initialize from localStorage, falling back to initial availability ---
+  const [showNight, setShowNight] = useState(() => {
+    const saved = localStorage.getItem(`admin-pref-night-${tutor.id}`);
+    return saved !== null ? JSON.parse(saved) : initiallyHasNight;
+  });
+
+  const [showWeekend, setShowWeekend] = useState(() => {
+    const saved = localStorage.getItem(`admin-pref-weekend-${tutor.id}`);
+    return saved !== null ? JSON.parse(saved) : initiallyHasWeekend;
+  });
+
+  // --- NEW: Save preferences to localStorage whenever they change ---
+  useEffect(() => {
+    localStorage.setItem(`admin-pref-night-${tutor.id}`, JSON.stringify(showNight));
+  }, [showNight, tutor.id]);
+
+  useEffect(() => {
+    localStorage.setItem(`admin-pref-weekend-${tutor.id}`, JSON.stringify(showWeekend));
+  }, [showWeekend, tutor.id]);
 
   const activeEndHour = showNight ? 22 : 17; 
   const activeDays = showWeekend 
     ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  // ... (The rest of your useEffects, handleSave, and return statement stay exactly the same) ...
 
   useEffect(() => {
     const initialSet = new Set<string>();

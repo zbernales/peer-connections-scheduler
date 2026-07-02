@@ -158,6 +158,9 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string, isOpen: boo
 }
 
 function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: ScheduleConfig }) {
+  // 1. Ensure DAYS includes Saturday and Sunday
+  const ALL_DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  
   const times: number[] = [];
   for (let i = 9; i < 22; i += 0.5) {
     times.push(i);
@@ -173,7 +176,7 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
     <div style={{ marginBottom: '3rem', backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '1rem' }}>
         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-          Darker green = Closer to maximum capacity ({config.tutorsPerHour} tutors)
+          Darker green = Closer to maximum capacity
         </span>
       </div>
       
@@ -182,8 +185,16 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
           <thead>
             <tr>
               <th style={{ padding: '0.75rem', borderBottom: '2px solid #cbd5e1', color: '#475569', width: '100px' }}>Time</th>
-              {DAYS.map(day => (
-                <th key={day} style={{ padding: '0.75rem', borderBottom: '2px solid #cbd5e1', color: '#1e293b' }}>{day}</th>
+              {ALL_DAYS.map(day => (
+                <th key={day} style={{ 
+                  padding: '0.75rem', 
+                  borderBottom: '2px solid #cbd5e1', 
+                  color: '#1e293b',
+                  // 2. Add the vertical line to the header
+                  borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' 
+                }}>
+                  {day}
+                </th>
               ))}
             </tr>
           </thead>
@@ -203,23 +214,26 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                   }}>
                     {format12Hour(floatToTime(t))}
                   </td>
-                  {DAYS.map(day => {
+                 {ALL_DAYS.map(day => {
+                    // Corrected the template literal and added the return statement
                     const count = counts[`${day}-${t}`] || 0;
                     
-                    const activeCap = t >= 17 ? (config.maxTutorsPerNightShift || 2) : config.tutorsPerHour;
+                    // Logic for determining capacity (Day vs Night vs Weekend)
+                    let activeCap = config.tutorsPerHour;
+                    if (t >= 17) activeCap = config.maxTutorsPerNightShift || 2;
+                    if (day === 'Saturday' || day === 'Sunday') activeCap = config.maxTutorsPerWeekendShift || 2;
+                    
                     const intensity = count / activeCap;
-                    
-                    const bgColor = count === 0 
-                      ? '#f8fafc' 
-                      : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
-                    
+                    const bgColor = count === 0 ? '#f8fafc' : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
                     const textColor = intensity > 0.6 ? 'white' : '#1e293b';
 
+                    // Ensure you are returning the JSX for the table cell
                     return (
                       <td key={day} style={{ 
                         padding: '0.5rem', 
                         borderBottom: '1px solid #e2e8f0',
                         borderRight: '1px solid #e2e8f0',
+                        borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none',
                         borderTop: isNightStart ? '3px solid #334155' : 'none', 
                         backgroundColor: bgColor,
                         color: textColor,

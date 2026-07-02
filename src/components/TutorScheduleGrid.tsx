@@ -175,7 +175,7 @@ export function TutorScheduleGrid({
               {isNightStart && weekdays.length > 0 && (
                 <>
                   <div style={{
-                    gridColumn: `1 / span ${weekdays.length + 1}`,
+                    gridColumn: `2 / span ${weekdays.length + 1}`,
                     height: '3px',
                     backgroundColor: '#334155',
                     marginTop: '0.75rem',

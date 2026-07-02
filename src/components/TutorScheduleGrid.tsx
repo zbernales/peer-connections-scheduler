@@ -7,7 +7,7 @@ interface TutorScheduleGridProps {
   selectedSlots: Set<string>; 
   onChange: (newSlots: Set<string>) => void; 
   endHour?: number;
-  days: string[]; // <-- Dynamic days array
+  days: string[];
 }
 
 function buildSlotSet(items: { day: string; startTime: string; endTime: string }[]) {
@@ -28,12 +28,20 @@ export function TutorScheduleGrid({
   selectedSlots, 
   onChange, 
   endHour = 17, 
-  days // <-- Destructured days prop
+  days 
 }: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
+
+  const weekdays = days.filter(d => d !== 'Saturday' && d !== 'Sunday');
+  const weekends = days.filter(d => d === 'Saturday' || d === 'Sunday');
+  const showSeparator = weekdays.length > 0 && weekends.length > 0;
+
+  const gridCols = showSeparator 
+    ? `60px repeat(${weekdays.length}, 1fr) 20px repeat(${weekends.length}, 1fr)`
+    : `60px repeat(${days.length}, 1fr)`;
 
   const times = useMemo(() => {
     const generatedTimes: string[] = [];
@@ -42,6 +50,11 @@ export function TutorScheduleGrid({
     }
     return generatedTimes;
   }, [endHour]);
+
+  // --- THE FIX: Calculate exactly how many rows the grid will have ---
+  // 1 Header row + 1 row for each time slot + 1 extra row if the horizontal night line renders
+  const showNightLine = times.includes('17:00') && weekdays.length > 0;
+  const totalRows = 1 + times.length + (showNightLine ? 1 : 0);
 
   useEffect(() => {
     const handleMouseUp = () => setIsDragging(false);
@@ -72,6 +85,33 @@ export function TutorScheduleGrid({
     }
   };
 
+  const renderCell = (day: string, time: string) => {
+    const cellId = `${day}-${time}`;
+    const isScheduled = selectedSlots.has(cellId);
+    const isAvailable = availableSlots.has(cellId);
+
+    let bgColor = '#f1f5f9'; 
+    if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
+    else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
+    else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
+
+    return (
+      <div
+        key={cellId}
+        onMouseDown={() => handleMouseDown(cellId)}
+        onMouseEnter={() => handleMouseEnter(cellId)}
+        title="Click and drag to toggle shift"
+        style={{
+          height: '24px',
+          backgroundColor: bgColor,
+          border: '1px solid #cbd5e1',
+          borderRadius: '2px',
+          cursor: 'pointer',
+        }}
+      />
+    );
+  };
+
   return (
     <div style={{ overflowX: 'auto', paddingBottom: '1rem', userSelect: 'none' }}>
       
@@ -95,20 +135,33 @@ export function TutorScheduleGrid({
       </div>
 
       <div 
-        style={{ display: 'grid', gridTemplateColumns: `60px repeat(${days.length}, 1fr)`, gap: '4px', minWidth: '600px' }}
+        style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '4px', minWidth: '600px', position: 'relative' }}
         onMouseLeave={() => setIsDragging(false)} 
       >
         <div></div> 
-        {/* Map over the days prop for headers */}
-        {days.map(day => (
-          <div key={day} style={{ 
-            textAlign: 'center', 
-            fontWeight: 'bold', 
-            padding: '0.5rem 0', 
-            backgroundColor: '#e2e8f0', 
-            borderRadius: '4px',
-            borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' // <-- Weekend Separator Line
-          }}>
+        
+        {weekdays.map(day => (
+          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
+            {day}
+          </div>
+        ))}
+
+        {/* --- THE SOLID VERTICAL LINE --- */}
+        {showSeparator && (
+          <div style={{
+            gridColumn: weekdays.length + 2,
+            gridRow: `1 / span ${totalRows}`, // <-- Now explicitly spans the exact calculated rows
+            width: '3px',
+            backgroundColor: '#334155',
+            justifySelf: 'center',
+            alignSelf: 'stretch', // Ensures it stretches vertically
+            borderRadius: '2px',
+            zIndex: 1
+          }} />
+        )}
+
+        {weekends.map(day => (
+          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
             {day}
           </div>
         ))}
@@ -119,18 +172,22 @@ export function TutorScheduleGrid({
           return (
             <div style={{ display: 'contents' }} key={time}>
     
-              {isNightStart && (
-                <div style={{
-                  gridColumn: '1 / -1', 
-                  height: '3px',
-                  backgroundColor: '#334155',
-                  marginTop: '0.75rem',
-                  marginBottom: '0.75rem', 
-                  borderRadius: '2px'
-                }} />
+              {isNightStart && weekdays.length > 0 && (
+                <>
+                  <div style={{
+                    gridColumn: `1 / span ${weekdays.length + 1}`,
+                    height: '3px',
+                    backgroundColor: '#334155',
+                    marginTop: '0.75rem',
+                    marginBottom: '0.75rem', 
+                    borderRadius: '2px'
+                  }} />
+                  {showSeparator && (
+                    <div style={{ gridColumn: `${weekdays.length + 3} / -1` }} />
+                  )}
+                </>
               )}
 
-              {/* Sidebar Time Label */}
               <div style={{ 
                 textAlign: 'right', 
                 paddingRight: '8px', 
@@ -145,34 +202,8 @@ export function TutorScheduleGrid({
                 {time.endsWith(':00') ? format12Hour(time) : ''}
               </div>
 
-              {/* Grid Cells mapping over days */}
-              {days.map(day => {
-                const cellId = `${day}-${time}`;
-                const isScheduled = selectedSlots.has(cellId);
-                const isAvailable = availableSlots.has(cellId);
-
-                let bgColor = '#f1f5f9'; 
-                if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
-                else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
-                else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
-
-                return (
-                  <div
-                    key={cellId}
-                    onMouseDown={() => handleMouseDown(cellId)}
-                    onMouseEnter={() => handleMouseEnter(cellId)}
-                    title="Click and drag to toggle shift"
-                    style={{
-                      height: '24px',
-                      backgroundColor: bgColor,
-                      border: '1px solid #cbd5e1',
-                      borderLeft: day === 'Saturday' ? '3px solid #334155' : '1px solid #cbd5e1', // <-- Weekend Separator Line
-                      borderRadius: '2px',
-                      cursor: 'pointer',
-                    }}
-                  />
-                );
-              })}
+              {weekdays.map(day => renderCell(day, time))}
+              {weekends.map(day => renderCell(day, time))}
             </div>
           );
         })}

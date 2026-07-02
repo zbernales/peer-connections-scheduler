@@ -172,16 +172,19 @@ export function TutorScheduleGrid({
           return (
             <div style={{ display: 'contents' }} key={time}>
     
+              {/* --- UPDATED: The Horizontal Line --- */}
               {isNightStart && weekdays.length > 0 && (
                 <>
                   <div style={{
-                    gridColumn: `2 / span ${weekdays.length + 1}`,
+                    // Start at column 2 (skipping the time sidebar) and span the weekdays
+                    gridColumn: `2 / span ${weekdays.length}`, 
                     height: '3px',
                     backgroundColor: '#334155',
                     marginTop: '0.75rem',
                     marginBottom: '0.75rem', 
                     borderRadius: '2px'
                   }} />
+                  {/* Invisible filler to keep the layout consistent on the weekend side */}
                   {showSeparator && (
                     <div style={{ gridColumn: `${weekdays.length + 3} / -1` }} />
                   )}

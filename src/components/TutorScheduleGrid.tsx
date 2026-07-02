@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Tutor, DayOfWeek } from '../types';
+import type { Tutor } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
 interface TutorScheduleGridProps {

@@ -35,7 +35,7 @@ export function TutorScheduleGrid({
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
 
-  // --- NEW: Separate the days to handle the visual gap ---
+  // Group days to handle the gap column
   const weekdays = days.filter(d => d !== 'Saturday' && d !== 'Sunday');
   const weekends = days.filter(d => d === 'Saturday' || d === 'Sunday');
   const showSeparator = weekdays.length > 0 && weekends.length > 0;
@@ -82,7 +82,7 @@ export function TutorScheduleGrid({
     }
   };
 
-  // Extracted cell rendering logic for cleaner JSX
+  // Helper to keep the JSX clean
   const renderCell = (day: string, time: string) => {
     const cellId = `${day}-${time}`;
     const isScheduled = selectedSlots.has(cellId);
@@ -102,7 +102,7 @@ export function TutorScheduleGrid({
         style={{
           height: '24px',
           backgroundColor: bgColor,
-          border: '1px solid #cbd5e1', // Back to uniform borders
+          border: '1px solid #cbd5e1',
           borderRadius: '2px',
           cursor: 'pointer',
         }}
@@ -133,7 +133,7 @@ export function TutorScheduleGrid({
       </div>
 
       <div 
-        style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '4px', minWidth: '600px' }}
+        style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '4px', minWidth: '600px', position: 'relative' }}
         onMouseLeave={() => setIsDragging(false)} 
       >
         <div></div> 
@@ -144,8 +144,19 @@ export function TutorScheduleGrid({
           </div>
         ))}
 
-        {/* Empty header above the vertical separator line */}
-        {showSeparator && <div></div>}
+        {/* --- THE SOLID VERTICAL LINE --- */}
+        {/* We explicitly place it in the gap column and span it from row 1 to the end */}
+        {showSeparator && (
+          <div style={{
+            gridColumn: weekdays.length + 2,
+            gridRow: '1 / -1',
+            width: '3px',
+            backgroundColor: '#334155',
+            justifySelf: 'center',
+            borderRadius: '2px',
+            zIndex: 1
+          }} />
+        )}
 
         {weekends.map(day => (
           <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
@@ -159,16 +170,22 @@ export function TutorScheduleGrid({
           return (
             <div style={{ display: 'contents' }} key={time}>
     
-              {/* Horizontal line stops exactly after weekdays */}
+              {/* --- THE HORIZONTAL LINE FIX --- */}
               {isNightStart && weekdays.length > 0 && (
-                <div style={{
-                  gridColumn: `1 / ${weekdays.length + 2}`, // 1 (Time col) + weekdays length
-                  height: '3px',
-                  backgroundColor: '#334155',
-                  marginTop: '0.75rem',
-                  marginBottom: '0.75rem', 
-                  borderRadius: '2px'
-                }} />
+                <>
+                  <div style={{
+                    gridColumn: `1 / span ${weekdays.length + 1}`, // Spans Time label + Weekdays
+                    height: '3px',
+                    backgroundColor: '#334155',
+                    marginTop: '0.75rem',
+                    marginBottom: '0.75rem', 
+                    borderRadius: '2px'
+                  }} />
+                  {/* We add an invisible block to fill the rest of the row, forcing the grid to drop to the next line cleanly */}
+                  {showSeparator && (
+                    <div style={{ gridColumn: `${weekdays.length + 3} / -1` }} />
+                  )}
+                </>
               )}
 
               {/* Sidebar Time Label */}
@@ -186,17 +203,8 @@ export function TutorScheduleGrid({
                 {time.endsWith(':00') ? format12Hour(time) : ''}
               </div>
 
-              {/* 1. Render Weekday Cells */}
+              {/* Grid Cells (Because the vertical line is strictly placed, CSS grid automatically steps over the gap for us!) */}
               {weekdays.map(day => renderCell(day, time))}
-
-              {/* 2. Render Vertical Separator Line centered in its column */}
-              {showSeparator && (
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: '3px', backgroundColor: '#334155', height: '100%', borderRadius: '2px' }}></div>
-                </div>
-              )}
-
-              {/* 3. Render Weekend Cells */}
               {weekends.map(day => renderCell(day, time))}
             </div>
           );

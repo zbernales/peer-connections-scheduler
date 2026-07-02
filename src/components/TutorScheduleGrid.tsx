@@ -7,7 +7,7 @@ interface TutorScheduleGridProps {
   selectedSlots: Set<string>; 
   onChange: (newSlots: Set<string>) => void; 
   endHour?: number;
-  days: string[];
+  days: string[]; // <-- Dynamic days array
 }
 
 function buildSlotSet(items: { day: string; startTime: string; endTime: string }[]) {
@@ -28,22 +28,12 @@ export function TutorScheduleGrid({
   selectedSlots, 
   onChange, 
   endHour = 17, 
-  days 
+  days // <-- Destructured days prop
 }: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
-
-  // Group days to handle the gap column
-  const weekdays = days.filter(d => d !== 'Saturday' && d !== 'Sunday');
-  const weekends = days.filter(d => d === 'Saturday' || d === 'Sunday');
-  const showSeparator = weekdays.length > 0 && weekends.length > 0;
-
-  // Insert a 20px gap column if both weekdays and weekends are present
-  const gridCols = showSeparator 
-    ? `60px repeat(${weekdays.length}, 1fr) 20px repeat(${weekends.length}, 1fr)`
-    : `60px repeat(${days.length}, 1fr)`;
 
   const times = useMemo(() => {
     const generatedTimes: string[] = [];
@@ -82,34 +72,6 @@ export function TutorScheduleGrid({
     }
   };
 
-  // Helper to keep the JSX clean
-  const renderCell = (day: string, time: string) => {
-    const cellId = `${day}-${time}`;
-    const isScheduled = selectedSlots.has(cellId);
-    const isAvailable = availableSlots.has(cellId);
-
-    let bgColor = '#f1f5f9'; 
-    if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
-    else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
-    else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
-
-    return (
-      <div
-        key={cellId}
-        onMouseDown={() => handleMouseDown(cellId)}
-        onMouseEnter={() => handleMouseEnter(cellId)}
-        title="Click and drag to toggle shift"
-        style={{
-          height: '24px',
-          backgroundColor: bgColor,
-          border: '1px solid #cbd5e1',
-          borderRadius: '2px',
-          cursor: 'pointer',
-        }}
-      />
-    );
-  };
-
   return (
     <div style={{ overflowX: 'auto', paddingBottom: '1rem', userSelect: 'none' }}>
       
@@ -133,33 +95,20 @@ export function TutorScheduleGrid({
       </div>
 
       <div 
-        style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '4px', minWidth: '600px', position: 'relative' }}
+        style={{ display: 'grid', gridTemplateColumns: `60px repeat(${days.length}, 1fr)`, gap: '4px', minWidth: '600px' }}
         onMouseLeave={() => setIsDragging(false)} 
       >
         <div></div> 
-        
-        {weekdays.map(day => (
-          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
-            {day}
-          </div>
-        ))}
-
-        {/* --- THE SOLID VERTICAL LINE --- */}
-        {/* We explicitly place it in the gap column and span it from row 1 to the end */}
-        {showSeparator && (
-          <div style={{
-            gridColumn: weekdays.length + 2,
-            gridRow: '1 / -1',
-            width: '3px',
-            backgroundColor: '#334155',
-            justifySelf: 'center',
-            borderRadius: '2px',
-            zIndex: 1
-          }} />
-        )}
-
-        {weekends.map(day => (
-          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
+        {/* Map over the days prop for headers */}
+        {days.map(day => (
+          <div key={day} style={{ 
+            textAlign: 'center', 
+            fontWeight: 'bold', 
+            padding: '0.5rem 0', 
+            backgroundColor: '#e2e8f0', 
+            borderRadius: '4px',
+            borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' // <-- Weekend Separator Line
+          }}>
             {day}
           </div>
         ))}
@@ -170,22 +119,15 @@ export function TutorScheduleGrid({
           return (
             <div style={{ display: 'contents' }} key={time}>
     
-              {/* --- THE HORIZONTAL LINE FIX --- */}
-              {isNightStart && weekdays.length > 0 && (
-                <>
-                  <div style={{
-                    gridColumn: `1 / span ${weekdays.length + 1}`, // Spans Time label + Weekdays
-                    height: '3px',
-                    backgroundColor: '#334155',
-                    marginTop: '0.75rem',
-                    marginBottom: '0.75rem', 
-                    borderRadius: '2px'
-                  }} />
-                  {/* We add an invisible block to fill the rest of the row, forcing the grid to drop to the next line cleanly */}
-                  {showSeparator && (
-                    <div style={{ gridColumn: `${weekdays.length + 3} / -1` }} />
-                  )}
-                </>
+              {isNightStart && (
+                <div style={{
+                  gridColumn: '1 / -1', 
+                  height: '3px',
+                  backgroundColor: '#334155',
+                  marginTop: '0.75rem',
+                  marginBottom: '0.75rem', 
+                  borderRadius: '2px'
+                }} />
               )}
 
               {/* Sidebar Time Label */}
@@ -203,9 +145,34 @@ export function TutorScheduleGrid({
                 {time.endsWith(':00') ? format12Hour(time) : ''}
               </div>
 
-              {/* Grid Cells (Because the vertical line is strictly placed, CSS grid automatically steps over the gap for us!) */}
-              {weekdays.map(day => renderCell(day, time))}
-              {weekends.map(day => renderCell(day, time))}
+              {/* Grid Cells mapping over days */}
+              {days.map(day => {
+                const cellId = `${day}-${time}`;
+                const isScheduled = selectedSlots.has(cellId);
+                const isAvailable = availableSlots.has(cellId);
+
+                let bgColor = '#f1f5f9'; 
+                if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
+                else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
+                else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
+
+                return (
+                  <div
+                    key={cellId}
+                    onMouseDown={() => handleMouseDown(cellId)}
+                    onMouseEnter={() => handleMouseEnter(cellId)}
+                    title="Click and drag to toggle shift"
+                    style={{
+                      height: '24px',
+                      backgroundColor: bgColor,
+                      border: '1px solid #cbd5e1',
+                      borderLeft: day === 'Saturday' ? '3px solid #334155' : '1px solid #cbd5e1', // <-- Weekend Separator Line
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                    }}
+                  />
+                );
+              })}
             </div>
           );
         })}

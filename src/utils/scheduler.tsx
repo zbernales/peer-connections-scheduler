@@ -1,6 +1,6 @@
 import type { Tutor, Shift, DayOfWeek, ScheduleConfig } from '../types';
 
-const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const START_HOUR = 9;  // 9.0 = 9:00 AM
 
 export function timeToFloat(timeStr: string): number {
@@ -49,11 +49,13 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
   const maxConsecutiveSlots = config.maxConsecutiveHours * 2;
   const minCooldownSlots = config.minCooldownHours * 2;
   const minShiftSlots = (config.minHoursPerShift || 0.5) * 2; 
-  
   const globalMaxWeekly = config.maxHoursPerWeek || 40; 
-  
-  // NEW: Calculate the dynamic end hour for the algorithm
-  const activeEndHour = config.autoScheduleNightHours ? 22 : 17; // 10:00 PM or 5:00 PM
+
+  // Determine which days to schedule based on config
+  const daysToProcess = DAYS.filter(day => {
+    if (day === 'Saturday' || day === 'Sunday') return config.autoScheduleWeekendHours;
+    return true;
+  });
   
   // Calculate Availability Scarcity per Tutor
   const tutorTotalAvailability: Record<string, number> = {};
@@ -65,20 +67,20 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
     tutorTotalAvailability[tutor.id] = totalHours;
   });
 
-  // Calculate the "Hardest Day" (Total availability pool per day)
-  const dailyAvailabilityScore: Record<string, number> = {
-    Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0
-  };
+  // Calculate the "Hardest Day" pool based on only enabled days
+  const dailyAvailabilityScore: Record<string, number> = {};
+  daysToProcess.forEach(d => dailyAvailabilityScore[d] = 0);
 
   tutors.forEach(tutor => {
     tutor.availability.forEach(slot => {
-      const duration = timeToFloat(slot.endTime) - timeToFloat(slot.startTime);
-      dailyAvailabilityScore[slot.day] += duration;
+      if (daysToProcess.includes(slot.day)) {
+        const duration = timeToFloat(slot.endTime) - timeToFloat(slot.startTime);
+        dailyAvailabilityScore[slot.day] += duration;
+      }
     });
   });
 
-  // Sort the days from least available (hardest) to most available (easiest)
-  const sortedDays = [...DAYS].sort((a, b) => dailyAvailabilityScore[a] - dailyAvailabilityScore[b]);
+  const sortedDays = daysToProcess.sort((a, b) => dailyAvailabilityScore[a] - dailyAvailabilityScore[b]);
 
   for (const day of sortedDays) {
     const consecutiveSlotsToday: Record<string, number> = {};
@@ -91,11 +93,18 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       hoursAssignedToday[t.id] = 0;
     });
 
-    // UPDATED: Loop now terminates at the dynamic activeEndHour
+    // Determine Dynamic End Hour per day type
+    // Weekends (Sat/Sun) always go to 22 (10pm). Weekdays depend on Night Hours setting.
+    const isWeekend = day === 'Saturday' || day === 'Sunday';
+    const activeEndHour = isWeekend ? 22 : (config.autoScheduleNightHours ? 22 : 17);
+
     for (let timeSlot = START_HOUR; timeSlot < activeEndHour; timeSlot += 0.5) {
       
       let eligibleTutors = tutors.filter(tutor => {
         const actualMax = Math.min(tutor.maxHours, globalMaxWeekly);
+
+        // Night constraint check for Mon-Fri
+        if (!isWeekend && !config.autoScheduleNightHours && timeSlot >= 17) return false;
 
         const canWork = isAvailable(tutor, day, timeSlot);
         const notWorking = !isAlreadyWorking(tutor.id, day, timeSlot, schedule);
@@ -118,7 +127,6 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
 
           for (let i = 1; i < minShiftSlots; i++) { 
             const futureSlot = timeSlot + (i * 0.5);
-            // UPDATED: Lookahead constraint now respects the dynamic end hour
             if (futureSlot >= activeEndHour || !isAvailable(tutor, day, futureSlot)) {
               return false;
             }
@@ -131,43 +139,34 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       let tutorsScheduledThisSlot = 0;
       const scheduledThisBlock = new Set<string>();
 
-      // NEW: Dynamically determine the maximum tutors allowed for this specific time block
-      const currentCap = timeSlot >= 17 
-        ? (config.maxTutorsPerNightShift || 2) // If it's 5PM or later, use the night cap
-        : config.tutorsPerHour;                // Otherwise use the standard daytime cap
+      // Dynamically determine cap: Weekend vs Night vs Day
+      const currentCap = isWeekend 
+        ? (config.maxTutorsPerWeekendShift || 2)
+        : (timeSlot >= 17 ? (config.maxTutorsPerNightShift || 2) : config.tutorsPerHour);
 
       while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < currentCap) {
         
         eligibleTutors.sort((a, b) => {
-          // PRIORITY 1: SHIFT MOMENTUM
           const aIsWorking = consecutiveSlotsToday[a.id] > 0;
           const bIsWorking = consecutiveSlotsToday[b.id] > 0;
           if (aIsWorking && !bIsWorking) return -1;
           if (!aIsWorking && bIsWorking) return 1;
 
-          // PRIORITY 2: MINIMUM HOURS
           const aNeedsMin = hoursAssigned[a.id] < a.minHours;
           const bNeedsMin = hoursAssigned[b.id] < b.minHours;
           if (aNeedsMin && !bNeedsMin) return -1;
           if (!aNeedsMin && bNeedsMin) return 1;
 
-          // PRIORITY 3: SCARCITY TIE-BREAKER
           if (aNeedsMin && bNeedsMin) {
             const aAvailable = tutorTotalAvailability[a.id];
             const bAvailable = tutorTotalAvailability[b.id];
-            if (aAvailable !== bAvailable) {
-              return aAvailable - bAvailable;
-            }
+            if (aAvailable !== bAvailable) return aAvailable - bAvailable;
           }
 
-          // PRIORITY 4: MAXIMIZE SUBJECT COVERAGE
           const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
           const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
-          if (aNewSubjects !== bNewSubjects) {
-            return bNewSubjects - aNewSubjects;
-          }
+          if (aNewSubjects !== bNewSubjects) return bNewSubjects - aNewSubjects;
 
-          // PRIORITY 5: PERCENTAGE-BASED LOAD BALANCING
           const aActualMax = Math.min(a.maxHours, globalMaxWeekly);
           const bActualMax = Math.min(b.maxHours, globalMaxWeekly);
           const aPercentFull = hoursAssigned[a.id] / aActualMax;

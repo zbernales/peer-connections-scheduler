@@ -158,6 +158,9 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string, isOpen: boo
 }
 
 function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: ScheduleConfig }) {
+  // 1. Ensure DAYS includes Saturday and Sunday
+  const ALL_DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  
   const times: number[] = [];
   for (let i = 9; i < 22; i += 0.5) {
     times.push(i);
@@ -173,7 +176,7 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
     <div style={{ marginBottom: '3rem', backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '1rem' }}>
         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-          Darker green = Closer to maximum capacity ({config.tutorsPerHour} tutors)
+          Darker green = Closer to maximum capacity
         </span>
       </div>
       
@@ -182,8 +185,16 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
           <thead>
             <tr>
               <th style={{ padding: '0.75rem', borderBottom: '2px solid #cbd5e1', color: '#475569', width: '100px' }}>Time</th>
-              {DAYS.map(day => (
-                <th key={day} style={{ padding: '0.75rem', borderBottom: '2px solid #cbd5e1', color: '#1e293b' }}>{day}</th>
+              {ALL_DAYS.map(day => (
+                <th key={day} style={{ 
+                  padding: '0.75rem', 
+                  borderBottom: '2px solid #cbd5e1', 
+                  color: '#1e293b',
+                  // 2. Add the vertical line to the header
+                  borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' 
+                }}>
+                  {day}
+                </th>
               ))}
             </tr>
           </thead>
@@ -203,23 +214,26 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                   }}>
                     {format12Hour(floatToTime(t))}
                   </td>
-                  {DAYS.map(day => {
+                 {ALL_DAYS.map(day => {
+                    // Corrected the template literal and added the return statement
                     const count = counts[`${day}-${t}`] || 0;
                     
-                    const activeCap = t >= 17 ? (config.maxTutorsPerNightShift || 2) : config.tutorsPerHour;
+                    // Logic for determining capacity (Day vs Night vs Weekend)
+                    let activeCap = config.tutorsPerHour;
+                    if (t >= 17) activeCap = config.maxTutorsPerNightShift || 2;
+                    if (day === 'Saturday' || day === 'Sunday') activeCap = config.maxTutorsPerWeekendShift || 2;
+                    
                     const intensity = count / activeCap;
-                    
-                    const bgColor = count === 0 
-                      ? '#f8fafc' 
-                      : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
-                    
+                    const bgColor = count === 0 ? '#f8fafc' : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
                     const textColor = intensity > 0.6 ? 'white' : '#1e293b';
 
+                    // Ensure you are returning the JSX for the table cell
                     return (
                       <td key={day} style={{ 
                         padding: '0.5rem', 
                         borderBottom: '1px solid #e2e8f0',
                         borderRight: '1px solid #e2e8f0',
+                        borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none',
                         borderTop: isNightStart ? '3px solid #334155' : 'none', 
                         backgroundColor: bgColor,
                         color: textColor,
@@ -299,12 +313,44 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
 function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: any) {
   const [draftSlots, setDraftSlots] = useState<Set<string>>(new Set());
 
-  const hasNightAvailability = tutor.availability.some((slot: any) => timeToFloat(slot.endTime) > 17);
-  const activeEndHour = hasNightAvailability ? 22 : 17; 
+  // Check if they initially submitted night/weekend availability
+  const initiallyHasNight = tutor.availability.some((slot: any) => 
+    timeToFloat(slot.endTime) > 17 && slot.day !== 'Saturday' && slot.day !== 'Sunday'
+  );
+  const initiallyHasWeekend = tutor.availability.some((slot: any) => 
+    slot.day === 'Saturday' || slot.day === 'Sunday'
+  );
+
+  // --- UPDATED: Initialize from localStorage, falling back to initial availability ---
+  const [showNight, setShowNight] = useState(() => {
+    const saved = localStorage.getItem(`admin-pref-night-${tutor.id}`);
+    return saved !== null ? JSON.parse(saved) : initiallyHasNight;
+  });
+
+  const [showWeekend, setShowWeekend] = useState(() => {
+    const saved = localStorage.getItem(`admin-pref-weekend-${tutor.id}`);
+    return saved !== null ? JSON.parse(saved) : initiallyHasWeekend;
+  });
+
+  // --- NEW: Save preferences to localStorage whenever they change ---
+  useEffect(() => {
+    localStorage.setItem(`admin-pref-night-${tutor.id}`, JSON.stringify(showNight));
+  }, [showNight, tutor.id]);
+
+  useEffect(() => {
+    localStorage.setItem(`admin-pref-weekend-${tutor.id}`, JSON.stringify(showWeekend));
+  }, [showWeekend, tutor.id]);
+
+  const activeEndHour = showNight ? 22 : 17; 
+  const activeDays = showWeekend 
+    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  // ... (The rest of your useEffects, handleSave, and return statement stay exactly the same) ...
 
   useEffect(() => {
     const initialSet = new Set<string>();
-    currentSchedule.forEach((shift: Shift) => {
+    currentSchedule.forEach((shift: any) => {
       let current = timeToFloat(shift.startTime);
       const end = timeToFloat(shift.endTime);
       while(current < end) {
@@ -316,14 +362,14 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   }, [currentSchedule]);
 
   const handleSave = () => {
-    const newShifts: Shift[] = Array.from(draftSlots).map(slot => {
+    const newShifts: any[] = Array.from(draftSlots).map(slot => {
       const [day, startTime] = slot.split('-');
       const endTime = floatToTime(timeToFloat(startTime) + 0.5);
       return {
         id: crypto.randomUUID(),
         tutorId: tutor.id,
         subjects: tutor.subjects,
-        day: day as DayOfWeek,
+        day: day,
         startTime,
         endTime
       };
@@ -340,11 +386,35 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
           <h2 style={{ margin: 0 }}>Edit {tutor.name}'s Schedule</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
         </div>
-        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        
+        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <p style={{ margin: '0 0 0.5rem 0' }}><strong>Subjects:</strong> {tutor.subjects.join(', ')}</p>
-            <p style={{ margin: 0 }}><strong>Hours Target:</strong> {tutor.minHours} - {tutor.maxHours} hrs/week</p>
+            <p style={{ margin: '0 0 1rem 0' }}><strong>Hours Target:</strong> {tutor.minHours} - {tutor.maxHours} hrs/week</p>
+            
+            {/* --- NEW: Admin Override Checkboxes --- */}
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#475569' }}>
+                <input 
+                  type="checkbox" 
+                  checked={showNight}
+                  onChange={(e) => setShowNight(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                Show night availability
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#475569' }}>
+                <input 
+                  type="checkbox" 
+                  checked={showWeekend}
+                  onChange={(e) => setShowWeekend(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                Show weekend availability
+              </label>
+            </div>
           </div>
+          
           <div style={{ textAlign: 'right' }}>
             <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: scheduledHours > tutor.maxHours || scheduledHours < tutor.minHours ? '#ef4444' : '#10b981' }}>
               Draft: {scheduledHours} hrs
@@ -352,7 +422,14 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
           </div>
         </div>
         
-        <TutorScheduleGrid tutor={tutor} selectedSlots={draftSlots} onChange={setDraftSlots} endHour={activeEndHour} />
+        {/* Pass the new activeDays array to the grid */}
+        <TutorScheduleGrid 
+          tutor={tutor} 
+          selectedSlots={draftSlots} 
+          onChange={setDraftSlots} 
+          endHour={activeEndHour} 
+          days={activeDays}
+        />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
           <button onClick={handleSave} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>
@@ -462,6 +539,7 @@ function App() {
   // --- NEW: Filters for Tutor Breakdowns ---
   const [tutorSubjectFilter, setTutorSubjectFilter] = useState('');
   const [tutorNightFilter, setTutorNightFilter] = useState(false);
+  const [tutorWeekendFilter, setTutorWeekendFilter] = useState(false);
 
   const [subjectSearchQuery, setSubjectSearchQuery] = useState('');
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
@@ -610,12 +688,18 @@ function App() {
 
   // --- UPDATED: Tutor filtering logic including Name, Subject, and Night Availability ---
   const filteredTutors = activeRoster.filter(tutor => {
-    const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
-    const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
-    const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
-    const matchesNight = !tutorNightFilter || hasNightAvailability;
-    return matchesName && matchesSubject && matchesNight;
-  });
+  const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
+  const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
+  
+  const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
+  const matchesNight = !tutorNightFilter || hasNightAvailability;
+
+  // --- NEW: Weekend filter logic ---
+  const hasWeekendAvailability = tutor.availability.some(slot => slot.day === 'Saturday' || slot.day === 'Sunday');
+  const matchesWeekend = !tutorWeekendFilter || hasWeekendAvailability;
+
+  return matchesName && matchesSubject && matchesNight && matchesWeekend;
+});
 
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
@@ -736,6 +820,7 @@ function App() {
                         onChange={(e) => setTutorSearchQuery(e.target.value)}
                         style={{ flex: 1, minWidth: '250px', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                       />
+                      
                       <select
                         value={tutorSubjectFilter}
                         onChange={(e) => setTutorSubjectFilter(e.target.value)}
@@ -746,6 +831,7 @@ function App() {
                           <option key={sub} value={sub}>{sub}</option>
                         ))}
                       </select>
+
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input
                           type="checkbox"
@@ -754,6 +840,17 @@ function App() {
                           style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
                         />
                         Available at Night
+                      </label>
+
+                      {/* --- NEW: Weekend Availability Checkbox --- */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input
+                          type="checkbox"
+                          checked={tutorWeekendFilter}
+                          onChange={(e) => setTutorWeekendFilter(e.target.checked)}
+                          style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+                        />
+                        Available on Weekends
                       </label>
                     </div>
 

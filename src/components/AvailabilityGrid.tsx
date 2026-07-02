@@ -2,27 +2,24 @@ import { useState, useEffect, useMemo } from 'react';
 import type { DayOfWeek } from '../types';
 import { format12Hour } from '../utils/scheduler';
 
-// --- NEW: Add startHour and endHour to the props interface ---
 interface AvailabilityGridProps {
   selectedSlots: Set<string>;
   onChange: (newSlots: Set<string>) => void;
   startHour?: number;
   endHour?: number;
+  days: DayOfWeek[];
 }
-
-const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 export function AvailabilityGrid({ 
   selectedSlots, 
   onChange, 
   startHour = 9, 
-  endHour = 17 
+  endHour = 17,
+  days // <-- Destructure the new days prop here
 }: AvailabilityGridProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove' | null>(null);
 
-  // --- NEW: Generate the times array dynamically based on the props ---
-  // We use useMemo so it only recalculates if the start/end hours actually change
   const times = useMemo(() => {
     const generatedTimes: string[] = [];
     for (let i = startHour; i < endHour; i += 0.5) {
@@ -68,10 +65,12 @@ export function AvailabilityGrid({
         <em>Click and drag to highlight your availability.</em>
       </p>
       
-      <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${DAYS.length}, 1fr)`, gap: '4px', minWidth: '600px' }}>
+      {/* Use days.length to dynamically size the grid columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${days.length}, 1fr)`, gap: '4px', minWidth: '600px' }}>
         
         <div></div> 
-        {DAYS.map(day => (
+        {/* Map over the days prop instead of the global DAYS constant */}
+        {days.map(day => (
           <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
             {day}
           </div>
@@ -83,7 +82,8 @@ export function AvailabilityGrid({
               {time.endsWith(':00') ? format12Hour(time) : ''}
             </div>
 
-            {DAYS.map(day => {
+            {/* Map over the days prop here as well */}
+            {days.map(day => {
               const cellId = `${day}-${time}`;
               const isSelected = selectedSlots.has(cellId);
 

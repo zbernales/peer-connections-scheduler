@@ -18,8 +18,17 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
   const [minHours, setMinHours] = useState<number>(initialData?.minHours || 2);
   const [maxHours, setMaxHours] = useState<number>(initialData?.maxHours || 6);
   
-  const initiallyHasNightAvailability = initialData?.availability?.some(slot => timeToFloat(slot.endTime) > 17) || false;
+  // Night availability setup
+  const initiallyHasNightAvailability = initialData?.availability?.some(slot => 
+    timeToFloat(slot.endTime) > 17 && slot.day !== 'Saturday' && slot.day !== 'Sunday'
+  ) || false;
   const [canTutorAtNight, setCanTutorAtNight] = useState(initiallyHasNightAvailability);
+
+  // Weekend availability setup
+  const initiallyHasWeekendAvailability = initialData?.availability?.some(slot => 
+    slot.day === 'Saturday' || slot.day === 'Sunday'
+  ) || false;
+  const [canTutorOnWeekends, setCanTutorOnWeekends] = useState(initiallyHasWeekendAvailability);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,6 +47,17 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
   if ((initialData as any)?.disabledNightAvailability) {
     (initialData as any).disabledNightAvailability.forEach((slot: TimeSlot) => {
+      let current = timeToFloat(slot.startTime);
+      const end = timeToFloat(slot.endTime);
+      while (current < end) {
+        defaultSlots.add(`${slot.day}-${floatToTime(current)}`);
+        current += 0.5;
+      }
+    });
+  }
+
+  if ((initialData as any)?.disabledWeekendAvailability) {
+    (initialData as any).disabledWeekendAvailability.forEach((slot: TimeSlot) => {
       let current = timeToFloat(slot.startTime);
       const end = timeToFloat(slot.endTime);
       while (current < end) {
@@ -66,6 +86,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
     const activeAvailability: TimeSlot[] = [];
     const disabledNightAvailability: TimeSlot[] = [];
+    const disabledWeekendAvailability: TimeSlot[] = [];
 
     Array.from(selectedSlots).forEach(slotId => {
       const [day, startTime] = slotId.split('-'); 
@@ -85,7 +106,11 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
         endTime
       };
 
-      if (!canTutorAtNight && hours >= 17) {
+      const isWeekend = day === 'Saturday' || day === 'Sunday';
+
+      if (!canTutorOnWeekends && isWeekend) {
+        disabledWeekendAvailability.push(slot);
+      } else if (!canTutorAtNight && !isWeekend && hours >= 17) {
         disabledNightAvailability.push(slot);
       } else {
         activeAvailability.push(slot);
@@ -99,7 +124,8 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       minHours,
       maxHours,
       availability: activeAvailability,
-      disabledNightAvailability 
+      disabledNightAvailability,
+      disabledWeekendAvailability
     };
 
     try {
@@ -115,6 +141,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
         setMinHours(2);
         setMaxHours(6);
         setCanTutorAtNight(false);
+        setCanTutorOnWeekends(false);
       }
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -183,15 +210,17 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
       <hr style={{ margin: '1.5rem 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
 
-      <h3 style={{ marginBottom: '0.5rem' }}>Daytime Availability</h3>
+      <h3 style={{ marginBottom: '0.5rem' }}>Daytime Availability (Mon-Fri)</h3>
       
       <AvailabilityGrid 
         selectedSlots={selectedSlots} 
         onChange={setSelectedSlots} 
         startHour={9}  
-        endHour={17}   
+        endHour={17}
+        days={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']}
       />
 
+      {/* --- Night Availability Section --- */}
       <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
           <input 
@@ -201,7 +230,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
             style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
           />
           <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>
-            I am available to tutor at night (5:00 PM - 10:00 PM)
+            I am available to tutor at night (Mon-Fri 5:00 PM - 10:00 PM)
           </strong>
         </label>
 
@@ -213,6 +242,35 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
               onChange={setSelectedSlots} 
               startHour={17} 
               endHour={22}   
+              days={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* --- Weekend Availability Section --- */}
+      <div style={{ marginTop: '1rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+          <input 
+            type="checkbox" 
+            checked={canTutorOnWeekends} 
+            onChange={(e) => setCanTutorOnWeekends(e.target.checked)} 
+            style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+          />
+          <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>
+            I am available to tutor on weekends (Sat-Sun 9:00 AM - 10:00 PM)
+          </strong>
+        </label>
+
+        {canTutorOnWeekends && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#475569' }}>Weekend Availability</h4>
+            <AvailabilityGrid 
+              selectedSlots={selectedSlots} 
+              onChange={setSelectedSlots} 
+              startHour={9} 
+              endHour={22}   
+              days={['Saturday', 'Sunday']}
             />
           </div>
         )}

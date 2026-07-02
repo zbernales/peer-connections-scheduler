@@ -1,4 +1,4 @@
-export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday';
+export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface TimeSlot {
   day: DayOfWeek;
@@ -33,4 +33,6 @@ export interface ScheduleConfig {
   maxHoursPerWeek?: number;
   autoScheduleNightHours?: boolean;
   maxTutorsPerNightShift?: number;
+  autoScheduleWeekendHours?: boolean;
+  maxTutorsPerWeekendShift?: number;
 }

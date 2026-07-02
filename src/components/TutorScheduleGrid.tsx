@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Tutor } from '../types';
+import type { Tutor, DayOfWeek } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
 interface TutorScheduleGridProps {
@@ -7,7 +7,7 @@ interface TutorScheduleGridProps {
   selectedSlots: Set<string>; 
   onChange: (newSlots: Set<string>) => void; 
   endHour?: number;
-  days: string[]; // <-- Dynamic days array
+  days: string[];
 }
 
 function buildSlotSet(items: { day: string; startTime: string; endTime: string }[]) {
@@ -28,12 +28,22 @@ export function TutorScheduleGrid({
   selectedSlots, 
   onChange, 
   endHour = 17, 
-  days // <-- Destructured days prop
+  days 
 }: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
+
+  // --- NEW: Separate the days to handle the visual gap ---
+  const weekdays = days.filter(d => d !== 'Saturday' && d !== 'Sunday');
+  const weekends = days.filter(d => d === 'Saturday' || d === 'Sunday');
+  const showSeparator = weekdays.length > 0 && weekends.length > 0;
+
+  // Insert a 20px gap column if both weekdays and weekends are present
+  const gridCols = showSeparator 
+    ? `60px repeat(${weekdays.length}, 1fr) 20px repeat(${weekends.length}, 1fr)`
+    : `60px repeat(${days.length}, 1fr)`;
 
   const times = useMemo(() => {
     const generatedTimes: string[] = [];
@@ -72,6 +82,34 @@ export function TutorScheduleGrid({
     }
   };
 
+  // Extracted cell rendering logic for cleaner JSX
+  const renderCell = (day: string, time: string) => {
+    const cellId = `${day}-${time}`;
+    const isScheduled = selectedSlots.has(cellId);
+    const isAvailable = availableSlots.has(cellId);
+
+    let bgColor = '#f1f5f9'; 
+    if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
+    else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
+    else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
+
+    return (
+      <div
+        key={cellId}
+        onMouseDown={() => handleMouseDown(cellId)}
+        onMouseEnter={() => handleMouseEnter(cellId)}
+        title="Click and drag to toggle shift"
+        style={{
+          height: '24px',
+          backgroundColor: bgColor,
+          border: '1px solid #cbd5e1', // Back to uniform borders
+          borderRadius: '2px',
+          cursor: 'pointer',
+        }}
+      />
+    );
+  };
+
   return (
     <div style={{ overflowX: 'auto', paddingBottom: '1rem', userSelect: 'none' }}>
       
@@ -95,20 +133,22 @@ export function TutorScheduleGrid({
       </div>
 
       <div 
-        style={{ display: 'grid', gridTemplateColumns: `60px repeat(${days.length}, 1fr)`, gap: '4px', minWidth: '600px' }}
+        style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '4px', minWidth: '600px' }}
         onMouseLeave={() => setIsDragging(false)} 
       >
         <div></div> 
-        {/* Map over the days prop for headers */}
-        {days.map(day => (
-          <div key={day} style={{ 
-            textAlign: 'center', 
-            fontWeight: 'bold', 
-            padding: '0.5rem 0', 
-            backgroundColor: '#e2e8f0', 
-            borderRadius: '4px',
-            borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' // <-- Weekend Separator Line
-          }}>
+        
+        {weekdays.map(day => (
+          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
+            {day}
+          </div>
+        ))}
+
+        {/* Empty header above the vertical separator line */}
+        {showSeparator && <div></div>}
+
+        {weekends.map(day => (
+          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
             {day}
           </div>
         ))}
@@ -119,9 +159,10 @@ export function TutorScheduleGrid({
           return (
             <div style={{ display: 'contents' }} key={time}>
     
-              {isNightStart && (
+              {/* Horizontal line stops exactly after weekdays */}
+              {isNightStart && weekdays.length > 0 && (
                 <div style={{
-                  gridColumn: '1 / -1', 
+                  gridColumn: `1 / ${weekdays.length + 2}`, // 1 (Time col) + weekdays length
                   height: '3px',
                   backgroundColor: '#334155',
                   marginTop: '0.75rem',
@@ -145,34 +186,18 @@ export function TutorScheduleGrid({
                 {time.endsWith(':00') ? format12Hour(time) : ''}
               </div>
 
-              {/* Grid Cells mapping over days */}
-              {days.map(day => {
-                const cellId = `${day}-${time}`;
-                const isScheduled = selectedSlots.has(cellId);
-                const isAvailable = availableSlots.has(cellId);
+              {/* 1. Render Weekday Cells */}
+              {weekdays.map(day => renderCell(day, time))}
 
-                let bgColor = '#f1f5f9'; 
-                if (isScheduled && isAvailable) bgColor = '#3b82f6'; 
-                else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
-                else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
+              {/* 2. Render Vertical Separator Line centered in its column */}
+              {showSeparator && (
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ width: '3px', backgroundColor: '#334155', height: '100%', borderRadius: '2px' }}></div>
+                </div>
+              )}
 
-                return (
-                  <div
-                    key={cellId}
-                    onMouseDown={() => handleMouseDown(cellId)}
-                    onMouseEnter={() => handleMouseEnter(cellId)}
-                    title="Click and drag to toggle shift"
-                    style={{
-                      height: '24px',
-                      backgroundColor: bgColor,
-                      border: '1px solid #cbd5e1',
-                      borderLeft: day === 'Saturday' ? '3px solid #334155' : '1px solid #cbd5e1', // <-- Weekend Separator Line
-                      borderRadius: '2px',
-                      cursor: 'pointer',
-                    }}
-                  />
-                );
-              })}
+              {/* 3. Render Weekend Cells */}
+              {weekends.map(day => renderCell(day, time))}
             </div>
           );
         })}

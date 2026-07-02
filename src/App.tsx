@@ -768,13 +768,30 @@ function App() {
 
                           const totalHours = tutorShifts.length * 0.5;
                           const isHovered = hoveredTutorId === tutor.id;
+                          
+                          // NEW: Check if tutor hours are out of bounds
+                          const isOutOfBounds = totalHours < tutor.minHours || totalHours > tutor.maxHours;
 
                           return (
                             <div 
                               key={tutor.id} 
                               onMouseEnter={() => setHoveredTutorId(tutor.id)}
                               onMouseLeave={() => setHoveredTutorId(null)}
-                              style={{ border: isHovered ? '2px solid #3b82f6' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#f8fafc' : '#fff', cursor: 'default', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
+                              style={{ 
+                                // UPDATED: Apply a red border and red tint background if out of bounds
+                                border: isHovered ? '2px solid #3b82f6' : (isOutOfBounds ? '1px solid #fca5a5' : '1px solid #e2e8f0'), 
+                                backgroundColor: isOutOfBounds 
+                                  ? (isHovered ? '#fee2e2' : '#fef2f2') // Light red tint, slightly darker on hover
+                                  : (isHovered ? '#f8fafc' : '#fff'),
+                                padding: '1.5rem', 
+                                borderRadius: '8px', 
+                                cursor: 'default', 
+                                transition: 'all 0.2s ease', 
+                                boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : '0 2px 4px rgba(0,0,0,0.05)', 
+                                transform: isHovered ? 'translateY(-4px)' : 'none', 
+                                display: 'flex', 
+                                flexDirection: 'column' 
+                              }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
@@ -799,7 +816,7 @@ function App() {
                                   </span>
                                 </div>
                               </div>
-                              <p style={{ margin: '0 0 1rem 0', color: totalHours < tutor.minHours || totalHours > tutor.maxHours ? '#ef4444' : '#10b981' }}>
+                              <p style={{ margin: '0 0 1rem 0', color: isOutOfBounds ? '#ef4444' : '#10b981' }}>
                                 <strong>Scheduled: {totalHours} hrs</strong> (Target: {tutor.minHours}-{tutor.maxHours} hrs)
                               </p>
                               <div style={{ flexGrow: 1 }}>

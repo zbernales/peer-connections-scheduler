@@ -525,6 +525,7 @@ function App() {
   // --- NEW: Filters for Tutor Breakdowns ---
   const [tutorSubjectFilter, setTutorSubjectFilter] = useState('');
   const [tutorNightFilter, setTutorNightFilter] = useState(false);
+  const [tutorWeekendFilter, setTutorWeekendFilter] = useState(false);
 
   const [subjectSearchQuery, setSubjectSearchQuery] = useState('');
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
@@ -673,12 +674,18 @@ function App() {
 
   // --- UPDATED: Tutor filtering logic including Name, Subject, and Night Availability ---
   const filteredTutors = activeRoster.filter(tutor => {
-    const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
-    const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
-    const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
-    const matchesNight = !tutorNightFilter || hasNightAvailability;
-    return matchesName && matchesSubject && matchesNight;
-  });
+  const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
+  const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
+  
+  const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
+  const matchesNight = !tutorNightFilter || hasNightAvailability;
+
+  // --- NEW: Weekend filter logic ---
+  const hasWeekendAvailability = tutor.availability.some(slot => slot.day === 'Saturday' || slot.day === 'Sunday');
+  const matchesWeekend = !tutorWeekendFilter || hasWeekendAvailability;
+
+  return matchesName && matchesSubject && matchesNight && matchesWeekend;
+});
 
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
@@ -799,6 +806,7 @@ function App() {
                         onChange={(e) => setTutorSearchQuery(e.target.value)}
                         style={{ flex: 1, minWidth: '250px', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                       />
+                      
                       <select
                         value={tutorSubjectFilter}
                         onChange={(e) => setTutorSubjectFilter(e.target.value)}
@@ -809,6 +817,7 @@ function App() {
                           <option key={sub} value={sub}>{sub}</option>
                         ))}
                       </select>
+
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input
                           type="checkbox"
@@ -817,6 +826,17 @@ function App() {
                           style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
                         />
                         Available at Night
+                      </label>
+
+                      {/* --- NEW: Weekend Availability Checkbox --- */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <input
+                          type="checkbox"
+                          checked={tutorWeekendFilter}
+                          onChange={(e) => setTutorWeekendFilter(e.target.checked)}
+                          style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+                        />
+                        Available on Weekends
                       </label>
                     </div>
 

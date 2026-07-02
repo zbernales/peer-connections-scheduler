@@ -94,7 +94,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
                 })} 
                 style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', marginTop: '2px' }}
               />
-              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule night hours (5 PM - 10 PM)</strong>
+              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule night hours (Mon-Fri 5PM - 10PM)</strong>
             </label>
 
             {config.autoScheduleNightHours && (
@@ -124,7 +124,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
                 })} 
                 style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', marginTop: '2px' }}
               />
-              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule weekend hours (Sat-Sun 9 AM - 10 PM)</strong>
+              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule weekend hours (Sat-Sun 9AM - 10PM)</strong>
             </label>
 
             {config.autoScheduleWeekendHours && (

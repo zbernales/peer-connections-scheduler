@@ -158,7 +158,6 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string, isOpen: boo
 }
 
 function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: ScheduleConfig }) {
-  // 1. Ensure DAYS includes Saturday and Sunday
   const ALL_DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   
   const times: number[] = [];
@@ -190,7 +189,6 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                   padding: '0.75rem', 
                   borderBottom: '2px solid #cbd5e1', 
                   color: '#1e293b',
-                  // 2. Add the vertical line to the header
                   borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' 
                 }}>
                   {day}
@@ -210,15 +208,13 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                     fontWeight: 'bold', 
                     color: '#64748b', 
                     borderRight: '2px solid #e2e8f0',
-                    borderTop: isNightStart ? '3px solid #334155' : 'none', 
+                    // REMOVED borderTop from here so it doesn't extend to the left
                   }}>
                     {format12Hour(floatToTime(t))}
                   </td>
-                 {ALL_DAYS.map(day => {
-                    // Corrected the template literal and added the return statement
+                  {ALL_DAYS.map(day => {
                     const count = counts[`${day}-${t}`] || 0;
                     
-                    // Logic for determining capacity (Day vs Night vs Weekend)
                     let activeCap = config.tutorsPerHour;
                     if (t >= 17) activeCap = config.maxTutorsPerNightShift || 2;
                     if (day === 'Saturday' || day === 'Sunday') activeCap = config.maxTutorsPerWeekendShift || 2;
@@ -227,14 +223,17 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                     const bgColor = count === 0 ? '#f8fafc' : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
                     const textColor = intensity > 0.6 ? 'white' : '#1e293b';
 
-                    // Ensure you are returning the JSX for the table cell
+                    // Check if it's a weekday for the line
+                    const isWeekday = day !== 'Saturday' && day !== 'Sunday';
+
                     return (
                       <td key={day} style={{ 
                         padding: '0.5rem', 
                         borderBottom: '1px solid #e2e8f0',
                         borderRight: '1px solid #e2e8f0',
                         borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none',
-                        borderTop: isNightStart ? '3px solid #334155' : 'none', 
+                        // ONLY apply borderTop if it's night AND a weekday
+                        borderTop: (isNightStart && isWeekday) ? '3px solid #334155' : 'none', 
                         backgroundColor: bgColor,
                         color: textColor,
                         transition: 'background-color 0.2s',

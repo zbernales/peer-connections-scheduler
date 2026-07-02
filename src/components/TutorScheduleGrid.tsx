@@ -2,15 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Tutor, DayOfWeek } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
-// --- UPDATED: Added endHour to the props ---
 interface TutorScheduleGridProps {
   tutor: Tutor;
   selectedSlots: Set<string>; 
   onChange: (newSlots: Set<string>) => void; 
   endHour?: number;
+  days: string[]; // <-- Dynamic days array
 }
-
-const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 function buildSlotSet(items: { day: string; startTime: string; endTime: string }[]) {
   const set = new Set<string>();
@@ -25,13 +23,18 @@ function buildSlotSet(items: { day: string; startTime: string; endTime: string }
   return set;
 }
 
-export function TutorScheduleGrid({ tutor, selectedSlots, onChange, endHour = 17 }: TutorScheduleGridProps) {
+export function TutorScheduleGrid({ 
+  tutor, 
+  selectedSlots, 
+  onChange, 
+  endHour = 17, 
+  days // <-- Destructured days prop
+}: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isAdding, setIsAdding] = useState(true);
 
-  // --- NEW: Generate times array dynamically based on endHour prop ---
   const times = useMemo(() => {
     const generatedTimes: string[] = [];
     for (let i = 9; i < endHour; i += 0.5) {
@@ -46,7 +49,6 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange, endHour = 17
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, []);
 
-  // Moved updateCell up so it can be safely called by the handlers
   const updateCell = (cellId: string, add: boolean) => {
     const newSlots = new Set(selectedSlots);
     if (add) {
@@ -93,12 +95,20 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange, endHour = 17
       </div>
 
       <div 
-        style={{ display: 'grid', gridTemplateColumns: `60px repeat(${DAYS.length}, 1fr)`, gap: '4px', minWidth: '600px' }}
+        style={{ display: 'grid', gridTemplateColumns: `60px repeat(${days.length}, 1fr)`, gap: '4px', minWidth: '600px' }}
         onMouseLeave={() => setIsDragging(false)} 
       >
         <div></div> 
-        {DAYS.map(day => (
-          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: '0.5rem 0', backgroundColor: '#e2e8f0', borderRadius: '4px' }}>
+        {/* Map over the days prop for headers */}
+        {days.map(day => (
+          <div key={day} style={{ 
+            textAlign: 'center', 
+            fontWeight: 'bold', 
+            padding: '0.5rem 0', 
+            backgroundColor: '#e2e8f0', 
+            borderRadius: '4px',
+            borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none' // <-- Weekend Separator Line
+          }}>
             {day}
           </div>
         ))}
@@ -135,8 +145,8 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange, endHour = 17
                 {time.endsWith(':00') ? format12Hour(time) : ''}
               </div>
 
-              {/* Grid Cells */}
-              {DAYS.map(day => {
+              {/* Grid Cells mapping over days */}
+              {days.map(day => {
                 const cellId = `${day}-${time}`;
                 const isScheduled = selectedSlots.has(cellId);
                 const isAvailable = availableSlots.has(cellId);
@@ -155,7 +165,8 @@ export function TutorScheduleGrid({ tutor, selectedSlots, onChange, endHour = 17
                     style={{
                       height: '24px',
                       backgroundColor: bgColor,
-                      border: '1px solid #cbd5e1', // Reverted to uniform borders
+                      border: '1px solid #cbd5e1',
+                      borderLeft: day === 'Saturday' ? '3px solid #334155' : '1px solid #cbd5e1', // <-- Weekend Separator Line
                       borderRadius: '2px',
                       cursor: 'pointer',
                     }}

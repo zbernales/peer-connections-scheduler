@@ -299,12 +299,26 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
 function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: any) {
   const [draftSlots, setDraftSlots] = useState<Set<string>>(new Set());
 
-  const hasNightAvailability = tutor.availability.some((slot: any) => timeToFloat(slot.endTime) > 17);
-  const activeEndHour = hasNightAvailability ? 22 : 17; 
+  // Check if they initially submitted night/weekend availability
+  const initiallyHasNight = tutor.availability.some((slot: any) => 
+    timeToFloat(slot.endTime) > 17 && slot.day !== 'Saturday' && slot.day !== 'Sunday'
+  );
+  const initiallyHasWeekend = tutor.availability.some((slot: any) => 
+    slot.day === 'Saturday' || slot.day === 'Sunday'
+  );
+
+  // State to control what the admin sees (defaults to the tutor's actual availability)
+  const [showNight, setShowNight] = useState(initiallyHasNight);
+  const [showWeekend, setShowWeekend] = useState(initiallyHasWeekend);
+
+  const activeEndHour = showNight ? 22 : 17; 
+  const activeDays = showWeekend 
+    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
   useEffect(() => {
     const initialSet = new Set<string>();
-    currentSchedule.forEach((shift: Shift) => {
+    currentSchedule.forEach((shift: any) => {
       let current = timeToFloat(shift.startTime);
       const end = timeToFloat(shift.endTime);
       while(current < end) {
@@ -316,14 +330,14 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   }, [currentSchedule]);
 
   const handleSave = () => {
-    const newShifts: Shift[] = Array.from(draftSlots).map(slot => {
+    const newShifts: any[] = Array.from(draftSlots).map(slot => {
       const [day, startTime] = slot.split('-');
       const endTime = floatToTime(timeToFloat(startTime) + 0.5);
       return {
         id: crypto.randomUUID(),
         tutorId: tutor.id,
         subjects: tutor.subjects,
-        day: day as DayOfWeek,
+        day: day,
         startTime,
         endTime
       };
@@ -340,11 +354,35 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
           <h2 style={{ margin: 0 }}>Edit {tutor.name}'s Schedule</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
         </div>
-        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        
+        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <p style={{ margin: '0 0 0.5rem 0' }}><strong>Subjects:</strong> {tutor.subjects.join(', ')}</p>
-            <p style={{ margin: 0 }}><strong>Hours Target:</strong> {tutor.minHours} - {tutor.maxHours} hrs/week</p>
+            <p style={{ margin: '0 0 1rem 0' }}><strong>Hours Target:</strong> {tutor.minHours} - {tutor.maxHours} hrs/week</p>
+            
+            {/* --- NEW: Admin Override Checkboxes --- */}
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#475569' }}>
+                <input 
+                  type="checkbox" 
+                  checked={showNight}
+                  onChange={(e) => setShowNight(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                Show night availability
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#475569' }}>
+                <input 
+                  type="checkbox" 
+                  checked={showWeekend}
+                  onChange={(e) => setShowWeekend(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                Show weekend availability
+              </label>
+            </div>
           </div>
+          
           <div style={{ textAlign: 'right' }}>
             <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: scheduledHours > tutor.maxHours || scheduledHours < tutor.minHours ? '#ef4444' : '#10b981' }}>
               Draft: {scheduledHours} hrs
@@ -352,7 +390,14 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
           </div>
         </div>
         
-        <TutorScheduleGrid tutor={tutor} selectedSlots={draftSlots} onChange={setDraftSlots} endHour={activeEndHour} />
+        {/* Pass the new activeDays array to the grid */}
+        <TutorScheduleGrid 
+          tutor={tutor} 
+          selectedSlots={draftSlots} 
+          onChange={setDraftSlots} 
+          endHour={activeEndHour} 
+          days={activeDays}
+        />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
           <button onClick={handleSave} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>

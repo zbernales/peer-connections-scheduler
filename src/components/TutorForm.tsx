@@ -77,11 +77,6 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       return;
     }
 
-    if (selectedSubjects.length === 0) {
-      alert("Please select at least one subject!");
-      return;
-    }
-
     setIsSubmitting(true);
 
     const activeAvailability: TimeSlot[] = [];
@@ -154,17 +149,17 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
   return (
     <form onSubmit={handleSubmit} style={{ border: '1px solid #ccc', padding: '1.5rem', borderRadius: '8px', backgroundColor: '#fff', marginBottom: '2rem', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
       <h2 style={{ marginTop: 0, color: '#0f172a' }}>
-        {initialData ? `Edit ${initialData.name}` : 'Add New Tutor'}
+        {initialData ? `Edit ${initialData.name}` : 'Add New Peer Educator'}
       </h2>
       
       <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
         <div>
-          <label><strong>Name:</strong></label><br/>
+          <label><strong>Name:<span style={{color: "red"}}> * </span></strong></label><br/>
           <input required value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} placeholder="e.g., Jane Doe" />
         </div>
         
         <div>
-          <label><strong>Courses Tutoring:</strong></label><br/>
+          <label><strong>Courses Supporting:</strong></label><br/>
           <SubjectSelector 
             selectedSubjects={selectedSubjects} 
             onChange={setSelectedSubjects} 
@@ -173,7 +168,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem' }}>
-            <strong>Target Weekly Hours for Tutoring</strong>
+            <strong>Target Weekly Hours <span style={{color: "red"}}> * </span> </strong> 
           </label>
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -210,7 +205,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
       <hr style={{ margin: '1.5rem 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
 
-      <h3 style={{ marginBottom: '0.5rem' }}>Daytime Availability (Mon-Fri)</h3>
+      <h3 style={{ marginBottom: '0.5rem' }}>Daytime Availability (Mon-Fri) <span style={{color: "red"}}> * </span></h3> 
       
       <AvailabilityGrid 
         selectedSlots={selectedSlots} 
@@ -230,7 +225,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
             style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
           />
           <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>
-            I am available to tutor at night (Mon-Fri 5:00 PM - 10:00 PM)
+            I am available for night hours (Mon-Fri 5:00 PM - 10:00 PM)
           </strong>
         </label>
 
@@ -258,7 +253,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
             style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
           />
           <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>
-            I am available to tutor on weekends (Sat-Sun 9:00 AM - 10:00 PM)
+            I am available for weekend hours (Sat-Sun 9:00 AM - 10:00 PM)
           </strong>
         </label>
 

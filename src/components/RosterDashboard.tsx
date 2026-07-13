@@ -13,10 +13,20 @@ interface RosterDashboardProps {
   onGenerate: () => void; 
 }
 
+// Helper to color-code roles
+const ROLE_COLORS: Record<string, { bg: string, text: string }> = {
+  'Tutor': { bg: '#e0f2fe', text: '#0369a1' },       // Light Blue
+  'SI Leader': { bg: '#f3e8ff', text: '#7e22ce' },   // Light Purple
+  'Mentor': { bg: '#dcfce7', text: '#15803d' },      // Light Green
+};
+
 export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor, onGenerate }: RosterDashboardProps) { 
   const navigate = useNavigate();
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
+  
+  // --- NEW: Search & Filter State ---
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('All');
 
   const handleDelete = async (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
@@ -58,9 +68,16 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
     }
   };
 
-  const filteredRoster = roster.filter(tutor => 
-    tutor.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // --- NEW: Combined Filtering Logic ---
+  const filteredRoster = roster.filter(tutor => {
+    const matchesSearch = tutor.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Default to 'Tutor' if the legacy data doesn't have a role assigned
+    const tutorRole = (tutor as any).role || 'Tutor';
+    const matchesRole = roleFilter === 'All' || tutorRole === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
 
   return (
     <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
@@ -177,30 +194,72 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
       {/* RIGHT COLUMN: Roster List */}
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0 }}>Roster ({roster.length})</h2>
+          <h2 style={{ margin: 0 }}>Roster ({filteredRoster.length})</h2>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button onClick={handleResetRoster} style={{ padding: '0.5rem 1rem', backgroundColor: 'red', color: 'white', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
-            <button onClick={() => navigate('/submit')} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ Add Tutor</button>
+            <button onClick={() => navigate('/submit')} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ Add Educator</button>
           </div>
         </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <input type="text" placeholder="🔍 Search peer educators by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} />
+        {/* --- NEW: Filters Container --- */}
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+          <input 
+            type="text" 
+            placeholder="🔍 Search peer educators by name..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} 
+          />
+          <select 
+            value={roleFilter} 
+            onChange={(e) => setRoleFilter(e.target.value)} 
+            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', backgroundColor: 'white', minWidth: '150px' }}
+          >
+            <option value="All">All Roles</option>
+            <option value="Tutor">Tutors</option>
+            <option value="SI Leader">SI Leaders</option>
+            <option value="Mentor">Mentors</option>
+          </select>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {filteredRoster.map(tutor => (
-            <div key={tutor.id} onClick={() => onSelectTutor(tutor)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}>
-              <div>
-                <h3 style={{ margin: '0 0 0.25rem 0' }}>{tutor.name}</h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}><strong>Target:</strong> {tutor.minHours}-{tutor.maxHours} hrs | <strong>Subjects:</strong> {tutor.subjects.length}</p>
+          {filteredRoster.map(tutor => {
+            const role = (tutor as any).role || 'Tutor';
+            const colors = ROLE_COLORS[role] || ROLE_COLORS['Tutor']; // Fallback for safety
+
+            return (
+              <div key={tutor.id} onClick={() => onSelectTutor(tutor)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                <div>
+                  {/* --- UPDATED: Name Header with Role Badge --- */}
+                  <h3 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {tutor.name}
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      padding: '0.2rem 0.6rem', 
+                      borderRadius: '12px', 
+                      backgroundColor: colors.bg, 
+                      color: colors.text, 
+                      fontWeight: 'bold',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {role}
+                    </span>
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}><strong>Target:</strong> {tutor.minHours}-{tutor.maxHours} hrs | <strong>Subjects:</strong> {tutor.subjects.length}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={(e) => { e.stopPropagation(); setEditingTutor(tutor); }} style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}>Edit</button>
+                  <button onClick={(e) => handleDelete(tutor.id, tutor.name, e)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444' }}>Delete</button>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button onClick={(e) => { e.stopPropagation(); setEditingTutor(tutor); }} style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}>Edit</button>
-                <button onClick={(e) => handleDelete(tutor.id, tutor.name, e)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444' }}>Delete</button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
+          {filteredRoster.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
+              No peer educators match your current filters.
+            </p>
+          )}
         </div>
       </div>
       

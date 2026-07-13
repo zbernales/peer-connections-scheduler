@@ -13,6 +13,8 @@ interface TutorFormProps {
 }
 
 export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
+  // --- NEW: Role state added ---
+  const [role, setRole] = useState((initialData as any)?.role || 'Tutor');
   const [name, setName] = useState(initialData?.name || '');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(initialData?.subjects || []);
   const [minHours, setMinHours] = useState<number>(initialData?.minHours || 2);
@@ -114,6 +116,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
     const tutorData = {
       id: initialData?.id || crypto.randomUUID(), 
+      role, // <-- NEW: Role added to the database payload
       name,
       subjects: selectedSubjects,
       minHours,
@@ -130,6 +133,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       onSubmit(tutorData as unknown as Tutor);
 
       if (!initialData) {
+        setRole('Tutor'); // Reset role
         setName('');
         setSelectedSubjects([]);
         setSelectedSlots(new Set());
@@ -153,6 +157,22 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       </h2>
       
       <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
+        
+        {/* --- NEW: Role Selection Dropdown --- */}
+        <div>
+          <label><strong>Role:<span style={{color: "red"}}> * </span></strong></label><br/>
+          <select 
+            required 
+            value={role} 
+            onChange={e => setRole(e.target.value)} 
+            style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: 'white' }}
+          >
+            <option value="Tutor">Tutor</option>
+            <option value="SI Leader">SI Leader</option>
+            <option value="Mentor">Mentor</option>
+          </select>
+        </div>
+
         <div>
           <label><strong>Name:<span style={{color: "red"}}> * </span></strong></label><br/>
           <input required value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} placeholder="e.g., Jane Doe" />

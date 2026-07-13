@@ -177,7 +177,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
       {/* RIGHT COLUMN: Roster List */}
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0 }}>Tutor Roster ({roster.length})</h2>
+          <h2 style={{ margin: 0 }}>Roster ({roster.length})</h2>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button onClick={handleResetRoster} style={{ padding: '0.5rem 1rem', backgroundColor: 'red', color: 'white', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
             <button onClick={() => navigate('/submit')} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ Add Tutor</button>
@@ -185,7 +185,7 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <input type="text" placeholder="🔍 Search tutors by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} />
+          <input type="text" placeholder="🔍 Search peer educators by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

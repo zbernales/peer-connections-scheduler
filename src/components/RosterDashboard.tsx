@@ -1,16 +1,12 @@
-import { useNavigate } from 'react-router-dom';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
-import type { Tutor, ScheduleConfig } from '../types';
+import type { Tutor } from '../types';
 import { useState } from 'react';
 
 interface RosterDashboardProps {
   roster: Tutor[];
-  config: ScheduleConfig;
-  onConfigChange: (newConfig: ScheduleConfig) => void;
   onSelectTutor: (tutor: Tutor) => void;
-  onGenerate: () => void; 
 }
 
 // Helper to color-code roles
@@ -20,11 +16,10 @@ const ROLE_COLORS: Record<string, { bg: string, text: string }> = {
   'Mentor': { bg: '#dcfce7', text: '#15803d' },      // Light Green
 };
 
-export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor, onGenerate }: RosterDashboardProps) { 
-  const navigate = useNavigate();
+export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps) { 
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
   
-  // --- NEW: Search & Filter State ---
+  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
 
@@ -68,11 +63,9 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
     }
   };
 
-  // --- NEW: Combined Filtering Logic ---
+  // Combined Filtering Logic
   const filteredRoster = roster.filter(tutor => {
     const matchesSearch = tutor.name.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // Default to 'Tutor' if the legacy data doesn't have a role assigned
     const tutorRole = (tutor as any).role || 'Tutor';
     const matchesRole = roleFilter === 'All' || tutorRole === roleFilter;
 
@@ -80,187 +73,78 @@ export function RosterDashboard({ roster, config, onConfigChange, onSelectTutor,
   });
 
   return (
-    <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '2rem' }}>
       
-      {/* LEFT COLUMN: Settings & Actions */}
-      <div style={{ flex: '0 0 350px', position: 'sticky', top: '2rem' }}>
-        <button 
-          onClick={() => {
-            onGenerate(); 
-            navigate('/schedule'); 
-          }}
-          style={{ width: '100%', padding: '1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '2rem', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)' }}
-        >
-          Generate Schedule
-        </button>
-        
-        {/* Main Settings Container */}
-        <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-          <h3 style={{ marginTop: 0 }}>⚙️ Algorithm Settings</h3>
-
-          {/* Night Settings */}
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', marginBottom: config.autoScheduleNightHours ? '1rem' : '0' }}>
-              <input 
-                type="checkbox" 
-                checked={config.autoScheduleNightHours || false} 
-                onChange={e => onConfigChange({
-                  ...config, 
-                  autoScheduleNightHours: e.target.checked,
-                  maxTutorsPerNightShift: config.maxTutorsPerNightShift || 2 
-                })} 
-                style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', marginTop: '2px' }}
-              />
-              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule night hours (Mon-Fri 5PM - 10PM)</strong>
-            </label>
-
-            {config.autoScheduleNightHours && (
-              <div style={{ paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: '#475569' }}>Max Tutors Per Night Shift</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  value={config.maxTutorsPerNightShift || 2} 
-                  onChange={e => onConfigChange({...config, maxTutorsPerNightShift: Number(e.target.value)})} 
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Weekend Settings */}
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', marginBottom: config.autoScheduleWeekendHours ? '1rem' : '0' }}>
-              <input 
-                type="checkbox" 
-                checked={config.autoScheduleWeekendHours || false} 
-                onChange={e => onConfigChange({
-                  ...config, 
-                  autoScheduleWeekendHours: e.target.checked,
-                  maxTutorsPerWeekendShift: config.maxTutorsPerWeekendShift || 2 
-                })} 
-                style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', marginTop: '2px' }}
-              />
-              <strong style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: '1.3' }}>Automatically schedule weekend hours (Sat-Sun 9AM - 10PM)</strong>
-            </label>
-
-            {config.autoScheduleWeekendHours && (
-              <div style={{ paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem', color: '#475569' }}>Max Tutors Per Weekend Shift</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  value={config.maxTutorsPerWeekendShift || 2} 
-                  onChange={e => onConfigChange({...config, maxTutorsPerWeekendShift: Number(e.target.value)})} 
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} 
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Other Configuration Fields */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Week</label>
-            <input type="number" min="0.5" step="0.5" value={config.maxHoursPerWeek || 6} onChange={e => onConfigChange({...config, maxHoursPerWeek: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Hours Per Day (Per Tutor)</label>
-            <input type="number" min="1" step="0.5" value={config.maxHoursPerDay} onChange={e => onConfigChange({...config, maxHoursPerDay: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Consecutive Hours</label>
-            <input type="number" min="0.5" step="0.5" value={config.maxConsecutiveHours} onChange={e => onConfigChange({...config, maxConsecutiveHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Hours Per Shift</label>
-            <input type="number" min="0.5" step="0.5" value={config.minHoursPerShift || 0.5} onChange={e => onConfigChange({...config, minHoursPerShift: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-          </div>
-          
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Min Cooldown Hours</label>
-            <input type="number" min="0.5" step="0.5" value={config.minCooldownHours} onChange={e => onConfigChange({...config, minCooldownHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Max Tutors per Hour (Daytime)</label>
-            <input type="number" min="1" value={config.tutorsPerHour} onChange={e => onConfigChange({...config, tutorsPerHour: Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.8rem' }}>Peer Educator Roster ({filteredRoster.length})</h2>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button onClick={handleResetRoster} style={{ padding: '0.5rem 1.5rem', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #f87171', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Roster List */}
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0 }}>Roster ({filteredRoster.length})</h2>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={handleResetRoster} style={{ padding: '0.5rem 1rem', backgroundColor: 'red', color: 'white', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
-            <button onClick={() => navigate('/submit')} style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ Add Educator</button>
-          </div>
-        </div>
+      {/* Filters Container */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'center' }}>
+        <input 
+          type="text" 
+          placeholder="🔍 Search peer educators by name..." 
+          value={searchQuery} 
+          onChange={(e) => setSearchQuery(e.target.value)} 
+          style={{ flex: 1, padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} 
+        />
+        <select 
+          value={roleFilter} 
+          onChange={(e) => setRoleFilter(e.target.value)} 
+          style={{ padding: '0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', backgroundColor: 'white', minWidth: '180px', cursor: 'pointer' }}
+        >
+          <option value="All">All Roles</option>
+          <option value="Tutor">Tutors</option>
+          <option value="SI Leader">SI Leaders</option>
+          <option value="Mentor">Mentors</option>
+        </select>
+      </div>
 
-        {/* --- NEW: Filters Container --- */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-          <input 
-            type="text" 
-            placeholder="🔍 Search peer educators by name..." 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)} 
-            style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} 
-          />
-          <select 
-            value={roleFilter} 
-            onChange={(e) => setRoleFilter(e.target.value)} 
-            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', backgroundColor: 'white', minWidth: '150px' }}
-          >
-            <option value="All">All Roles</option>
-            <option value="Tutor">Tutors</option>
-            <option value="SI Leader">SI Leaders</option>
-            <option value="Mentor">Mentors</option>
-          </select>
-        </div>
+      <div style={{ display: 'grid', gap: '1rem' }}>
+        {filteredRoster.map(tutor => {
+          const role = (tutor as any).role || 'Tutor';
+          const colors = ROLE_COLORS[role] || ROLE_COLORS['Tutor'];
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {filteredRoster.map(tutor => {
-            const role = (tutor as any).role || 'Tutor';
-            const colors = ROLE_COLORS[role] || ROLE_COLORS['Tutor']; // Fallback for safety
-
-            return (
-              <div key={tutor.id} onClick={() => onSelectTutor(tutor)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}>
-                <div>
-                  {/* --- UPDATED: Name Header with Role Badge --- */}
-                  <h3 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    {tutor.name}
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      padding: '0.2rem 0.6rem', 
-                      borderRadius: '12px', 
-                      backgroundColor: colors.bg, 
-                      color: colors.text, 
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      {role}
-                    </span>
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}><strong>Target:</strong> {tutor.minHours}-{tutor.maxHours} hrs | <strong>Subjects:</strong> {tutor.subjects.length}</p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={(e) => { e.stopPropagation(); setEditingTutor(tutor); }} style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}>Edit</button>
-                  <button onClick={(e) => handleDelete(tutor.id, tutor.name, e)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444' }}>Delete</button>
-                </div>
+          return (
+            <div key={tutor.id} onClick={() => onSelectTutor(tutor)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+                 onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                 onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+            >
+              <div>
+                <h3 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.3rem' }}>
+                  {tutor.name}
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    padding: '0.2rem 0.6rem', 
+                    borderRadius: '12px', 
+                    backgroundColor: colors.bg, 
+                    color: colors.text, 
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {role}
+                  </span>
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: '#64748b' }}><strong>Target:</strong> {tutor.minHours}-{tutor.maxHours} hrs | <strong>Subjects:</strong> {tutor.subjects.length}</p>
               </div>
-            );
-          })}
-          {filteredRoster.length === 0 && (
-            <p style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button onClick={(e) => { e.stopPropagation(); setEditingTutor(tutor); }} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569', fontWeight: 'bold' }}>Edit Profile</button>
+                <button onClick={(e) => handleDelete(tutor.id, tutor.name, e)} style={{ padding: '0.5rem 1rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>Remove</button>
+              </div>
+            </div>
+          );
+        })}
+        {filteredRoster.length === 0 && (
+          <div style={{ textAlign: 'center', backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', padding: '3rem', borderRadius: '8px' }}>
+            <p style={{ color: '#64748b', fontSize: '1.1rem', margin: 0 }}>
               No peer educators match your current filters.
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       
       {editingTutor && (

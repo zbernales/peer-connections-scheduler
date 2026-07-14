@@ -35,4 +35,5 @@ export interface ScheduleConfig {
   maxTutorsPerNightShift?: number;
   autoScheduleWeekendHours?: boolean;
   maxTutorsPerWeekendShift?: number;
+  allowedRoles?: string[];
 }

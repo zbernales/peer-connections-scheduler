@@ -44,7 +44,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate }: S
             boxShadow: isGenerateDisabled ? 'none' : '0 4px 6px -1px rgba(16, 185, 129, 0.4)' 
           }}
         >
-          ✨ Generate Master Schedule
+          Generate Master Schedule
         </button>
       </div>
 

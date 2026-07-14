@@ -654,6 +654,48 @@ function App() {
     }
   };
 
+  // 1. Add this state near your other useState declarations at the top of App
+  const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
+
+  // 2. Add this helper function somewhere before your return statement
+  const handleCopySchedule = (tutor: any, tutorShifts: any[], totalHours: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    let text = `Schedule for ${tutor.name}\n`;
+    text += `Total Hours: ${totalHours} (Target: ${tutor.minHours}-${tutor.maxHours} hrs)\n\n`;
+
+    if (tutorShifts.length === 0) {
+      text += "Not scheduled this week.\n";
+    } else {
+      // DAYS should refer to the same array you map over in the UI (e.g., ['Monday', 'Tuesday', ...])
+      DAYS.forEach(day => {
+        const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter((s: any) => s.day === day);
+        if (shiftsForThisDay.length > 0) {
+          text += `${day}:\n`;
+          shiftsForThisDay.forEach((block: any) => {
+            text += `${format12Hour(block.startTime)} - ${format12Hour(block.endTime)}\n`;
+          });
+          text += '\n';
+        }
+      });
+    }
+
+    // Secure cross-browser clipboard copy
+    const textArea = document.createElement("textarea");
+    textArea.value = text.trim();
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      // Show visual confirmation!
+      setCopiedTutorId(tutor.id);
+      setTimeout(() => setCopiedTutorId(null), 2000); 
+    } catch (err) {
+      console.error('Failed to copy schedule', err);
+    }
+    document.body.removeChild(textArea);
+  };
+
   const handleRemoveTutorFromSchedule = (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
     
@@ -806,7 +848,7 @@ function App() {
                         }}
                         style={{ padding: '0.5rem', borderRadius: '20px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontWeight: 'bold', color: '#3b82f6', cursor: 'pointer' }}
                       >
-                        <option value="" disabled>+ Import Missing Tutor</option>
+                        <option value="" disabled>+ Import Missing Educator</option>
                         {missingTutors.map(t => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
@@ -814,14 +856,14 @@ function App() {
                     )}
                     
                     <span style={{ backgroundColor: '#e2e8f0', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 'bold' }}>
-                      Total Tutors: {activeRoster.length}
+                      Total Educators: {activeRoster.length}
                     </span>
                   </div>
                 </div>
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
 
-                <SectionHeader title="Tutor Breakdowns" isOpen={isTutorsOpen} onToggle={() => setIsTutorsOpen(!isTutorsOpen)} />
+                <SectionHeader title="Peer Educator Breakdowns" isOpen={isTutorsOpen} onToggle={() => setIsTutorsOpen(!isTutorsOpen)} />
                 
                 {isTutorsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
@@ -829,7 +871,7 @@ function App() {
                     <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       <input 
                         type="text" 
-                        placeholder="🔍 Search for a specific tutor..." 
+                        placeholder="🔍 Search for a specific peer educator..." 
                         value={tutorSearchQuery}
                         onChange={(e) => setTutorSearchQuery(e.target.value)}
                         style={{ flex: 1, minWidth: '250px', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
@@ -907,6 +949,20 @@ function App() {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <h3 style={{ marginTop: 0, color: '#1e293b' }}>{tutor.name}</h3>
                                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                   <button
+                                    onClick={(e) => handleCopySchedule(tutor, tutorShifts, totalHours, e)}
+                                    style={{ 
+                                      background: 'none', border: 'none', 
+                                      color: copiedTutorId === tutor.id ? '#10b981' : '#64748b', 
+                                      cursor: 'pointer', fontSize: '1.1rem',
+                                      opacity: (isHovered || copiedTutorId === tutor.id) ? 1 : 0, 
+                                      transition: 'all 0.2s', padding: 0
+                                    }}
+                                    title="Copy Schedule to Clipboard"
+                                  >
+                                    {copiedTutorId === tutor.id ? '✅' : '📋'}
+                                  </button>
+                                  
                                   <button
                                     onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
                                     style={{ 

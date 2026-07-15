@@ -662,10 +662,10 @@ function App() {
     e.stopPropagation();
 
     let text = `Schedule for ${tutor.name}\n`;
-    text += `Total Hours: ${totalHours} (Target: ${tutor.minHours}-${tutor.maxHours} hrs)\n\n`;
+    text += `Total Hours: ${totalHours}\n\n`;
 
     if (tutorShifts.length === 0) {
-      text += "Not scheduled this week.\n";
+      text += "No shifts scheduled.\n";
     } else {
       // DAYS should refer to the same array you map over in the UI (e.g., ['Monday', 'Tuesday', ...])
       DAYS.forEach(day => {
@@ -962,7 +962,7 @@ function App() {
                                   >
                                     {copiedTutorId === tutor.id ? '✅' : '📋'}
                                   </button>
-                                  
+
                                   <button
                                     onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
                                     style={{ 

@@ -12,8 +12,9 @@ interface SubjectScheduleGridProps {
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectScheduleGridProps) {
+export function SubjectScheduleGrid({ subject, shifts, roster, endHour = 17 }: SubjectScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false); // NEW: Copy state
 
   // --- NEW: Dynamically generate the times array based on the endHour prop ---
   const times = useMemo(() => {
@@ -45,19 +46,90 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
     }
   });
 
+  // --- NEW: Copy Function specifically for the Grid View ---
+  const handleCopyGrid = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    let text = `${subject} Coverage Schedule\n\n`;
+
+    if (shifts.length === 0) {
+      text += "No coverage scheduled this week.\n";
+    } else {
+      const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      
+      ALL_DAYS.forEach(day => {
+        const dayShifts = shifts.filter(s => s.day === day);
+        if (dayShifts.length > 0) {
+          text += `${day}:\n`;
+          // Sort sequentially by start time
+          dayShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+          
+          dayShifts.forEach(shift => {
+            const tutor = roster.find(t => t.id === shift.tutorId);
+            const tutorName = tutor ? tutor.name : 'Unknown Educator';
+            const role = tutor && (tutor as any).role ? (tutor as any).role : 'Tutor';
+            
+            text += `- ${format12Hour(shift.startTime)} to ${format12Hour(shift.endTime)} (${tutorName}, ${role})\n`;
+          });
+          text += '\n';
+        }
+      });
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text.trim();
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy grid schedule', err);
+    }
+    document.body.removeChild(textArea);
+  };
+
   return (
     <div style={{ overflowX: 'auto', paddingBottom: '1rem', paddingTop: '1rem' }}>
       
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '16px', height: '16px', backgroundColor: '#10b981', borderRadius: '4px' }}></div>
-          <span>Covered</span>
+      {/* Header Controls: Legend + Copy Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', backgroundColor: '#10b981', borderRadius: '4px' }}></div>
+            <span>Covered</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px' }}></div>
+            <span>No Coverage</span>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '16px', height: '16px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px' }}></div>
-          <span>No Coverage</span>
-        </div>
+
+        {/* Copy Button */}
+        <button 
+          onClick={handleCopyGrid}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.5rem 1rem',
+            backgroundColor: isCopied ? '#ecfdf5' : 'white',
+            color: isCopied ? '#10b981' : '#475569',
+            border: `1px solid ${isCopied ? '#10b981' : '#cbd5e1'}`,
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+          }}
+          title={`Copy ${subject} Schedule`}
+        >
+          {isCopied ? '✅ Copied to Clipboard!' : '📋 Copy Schedule Text'}
+        </button>
+
       </div>
 
       {/* The Grid */}

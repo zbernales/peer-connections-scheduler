@@ -94,7 +94,7 @@ function mergeShiftsForUI(shifts: any[]) {
   return merged;
 }
 
-function getMergedWeeklySchedule(weeklyShifts: any[]) {
+/*function getMergedWeeklySchedule(weeklyShifts: any[]) {
   if (weeklyShifts.length === 0) return [];
   const groupedByTutor = [...weeklyShifts].sort((a, b) => {
     if (a.tutorId !== b.tutorId) return a.tutorId.localeCompare(b.tutorId); 
@@ -106,7 +106,7 @@ function getMergedWeeklySchedule(weeklyShifts: any[]) {
     if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
     return timeToFloat(a.startTime) - timeToFloat(b.startTime);
   });
-}
+}*/
 
 function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: React.ReactNode }) {
   if (!isAdmin) {

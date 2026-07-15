@@ -326,18 +326,32 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
             style={{ 
               background: 'none', border: 'none', 
               color: isCopied ? '#10b981' : '#64748b', 
-              cursor: 'pointer', fontSize: '1.1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               opacity: (isHovered || isCopied) ? 1 : 0, 
               transition: 'all 0.2s', padding: 0
             }}
             title={`Copy ${subject} Coverage to Clipboard`}
           >
-            {isCopied ? '✅' : '📋'}
+            {isCopied ? (
+              // Modern Checkmark SVG
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            ) : (
+              // Modern Copy/Clipboard SVG
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            )}
           </button>
           
           <span 
             onClick={() => setSelectedSubjectModal(subject)}
-            style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
+            style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
           >
             ↗
           </span>

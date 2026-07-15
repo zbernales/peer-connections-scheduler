@@ -1072,17 +1072,47 @@ function App() {
                                           </button>
 
                                           <button
-                                            onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
-                                            style={{ 
-                                              background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem',
-                                              opacity: isHovered ? 0.7 : 0, transition: 'opacity 0.2s', padding: 0
-                                            }}
-                                            title="Remove from Schedule"
-                                            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-                                          >
-                                            🗑️
-                                          </button>
+                                        onClick={(e) => handleCopySchedule(tutor, tutorShifts, totalHours, e)}
+                                        style={{ 
+                                          background: 'none', border: 'none', 
+                                          color: copiedTutorId === tutor.id ? '#10b981' : '#64748b', 
+                                          cursor: 'pointer', fontSize: '1.1rem',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                          opacity: (isHovered || copiedTutorId === tutor.id) ? 1 : 0, 
+                                          transition: 'all 0.2s', padding: 0
+                                        }}
+                                        title="Copy Schedule to Clipboard"
+                                      >
+                                        {copiedTutorId === tutor.id ? (
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        ) : (
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                        )}
+                                      </button>
+
+                                      {/* --- UPDATED TRASH BUTTON --- */}
+                                      <button
+                                        onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
+                                        style={{ 
+                                          background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
+                                          display: 'flex',        // <-- Added for perfect alignment
+                                          alignItems: 'center',   // <-- Added for perfect alignment
+                                          justifyContent: 'center',
+                                          opacity: isHovered ? 0.7 : 0, transition: 'opacity 0.2s', padding: 0
+                                        }}
+                                        title="Remove from Schedule"
+                                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                                      >
+                                        {/* Modern Trash SVG */}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="3 6 5 6 21 6"></polyline>
+                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                          <line x1="10" y1="11" x2="10" y2="17"></line>
+                                          <line x1="14" y1="11" x2="14" y2="17"></line>
+                                        </svg>
+                                      </button>
+                                      
                                           <span 
                                             onClick={() => setSelectedTutorModal(tutor)}
                                             style={{ color: isHovered ? '#3b82f6' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}

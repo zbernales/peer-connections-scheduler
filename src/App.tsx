@@ -94,7 +94,7 @@ function mergeShiftsForUI(shifts: any[]) {
   return merged;
 }
 
-/*function getMergedWeeklySchedule(weeklyShifts: any[]) {
+function getMergedWeeklySchedule(weeklyShifts: any[]) {
   if (weeklyShifts.length === 0) return [];
   const groupedByTutor = [...weeklyShifts].sort((a, b) => {
     if (a.tutorId !== b.tutorId) return a.tutorId.localeCompare(b.tutorId); 
@@ -106,7 +106,7 @@ function mergeShiftsForUI(shifts: any[]) {
     if (a.day !== b.day) return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
     return timeToFloat(a.startTime) - timeToFloat(b.startTime);
   });
-}*/
+}
 
 function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: React.ReactNode }) {
   if (!isAdmin) {
@@ -254,7 +254,7 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
   );
 }
 
-function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHoveredSubject, setSelectedSubjectModal }: any) {
+export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHoveredSubject, setSelectedSubjectModal }: any) {
   
   // 1. Copy State
   const [isCopied, setIsCopied] = useState(false);
@@ -263,18 +263,13 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
   const isHovered = hoveredSubject === subject;
   const subjectShifts = schedule.filter((s: any) => s.subjects.includes(subject));
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  const mergedShifts = subjectShifts; 
+  
+  // RESTORED: This merges 30-min blocks into clean, contiguous shifts!
+  const mergedShifts = getMergedWeeklySchedule(subjectShifts); 
 
-  // 3. Copy Function Logic
+  // 3. Copy Function Logic (Now uses mergedShifts)
   const handleCopySubject = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    const formatTime = (time24: string) => {
-      const [h, m] = time24.split(':');
-      const hours = parseInt(h, 10);
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      return `${hours % 12 || 12}:${m} ${ampm}`;
-    };
 
     let text = `${subject} Coverage Schedule\n\n`;
 
@@ -283,7 +278,8 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
     } else {
       const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       ALL_DAYS.forEach(day => {
-        const dayShifts = subjectShifts.filter((s: any) => s.day === day);
+        // USE mergedShifts HERE so the clipboard text is clean
+        const dayShifts = mergedShifts.filter((s: any) => s.day === day);
         if (dayShifts.length > 0) {
           text += `${day}:\n`;
           dayShifts.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
@@ -292,7 +288,7 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
             const tutor = activeRoster.find((t: any) => t.id === shift.tutorId);
             const tutorName = tutor ? tutor.name : 'Unknown Educator';
             const role = tutor && tutor.role ? tutor.role : 'Tutor';
-            text += `- ${formatTime(shift.startTime)} to ${formatTime(shift.endTime)} (${tutorName}, ${role})\n`;
+            text += `- ${format12Hour(shift.startTime)} to ${format12Hour(shift.endTime)} (${tutorName}, ${role})\n`;
           });
           text += '\n';
         }
@@ -362,11 +358,6 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
                   <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
                   {dayShifts.map((block: any, index: number) => {
                     const tutorName = activeRoster.find((t: any) => t.id === block.tutorId)?.name || 'Unknown';
-                    const format12Hour = (time24: string) => {
-                       const [h, m] = time24.split(':');
-                       const hours = parseInt(h, 10);
-                       return `${hours % 12 || 12}:${m} ${hours >= 12 ? 'PM' : 'AM'}`;
-                    };
                     return (
                       <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
                         {format12Hour(block.startTime)} - {format12Hour(block.endTime)}: <span style={{ color: '#3b82f6', fontWeight: '500' }}>{tutorName}</span>

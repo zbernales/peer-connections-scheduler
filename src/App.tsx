@@ -316,7 +316,7 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
       style={{ border: isHovered ? '2px solid #10b981' : '1px solid #e2e8f0', padding: '1.5rem', borderRadius: '8px', backgroundColor: isHovered ? '#ecfdf5' : '#f8fafc', cursor: 'default', transition: 'all 0.2s ease', boxShadow: isHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none', transform: isHovered ? 'translateY(-4px)' : 'none', display: 'flex', flexDirection: 'column' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <h3 style={{ marginTop: 0, color: '#0f172a' }}>📚 {subject}</h3>
+        <h3 style={{ marginTop: 0, color: '#0f172a' }}>{subject}</h3>
         
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           
@@ -1236,7 +1236,7 @@ function App() {
                     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
                       <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                          <h2 style={{ margin: 0 }}>📚 {selectedSubjectModal} Coverage</h2>
+                          <h2 style={{ margin: 0 }}>{selectedSubjectModal} Coverage</h2>
                           <button onClick={() => setSelectedSubjectModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
                         </div>
                         

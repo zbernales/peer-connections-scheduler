@@ -255,9 +255,63 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
 }
 
 function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHoveredSubject, setSelectedSubjectModal }: any) {
-  const subjectShifts = schedule.filter((s: any) => s.subjects.includes(subject));
+  
+  // 1. Copy State
+  const [isCopied, setIsCopied] = useState(false);
+
+  // 2. Existing Variables
   const isHovered = hoveredSubject === subject;
-  const mergedShifts = getMergedWeeklySchedule(subjectShifts);
+  const subjectShifts = schedule.filter((s: any) => s.subjects.includes(subject));
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const mergedShifts = subjectShifts; 
+
+  // 3. Copy Function Logic
+  const handleCopySubject = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const formatTime = (time24: string) => {
+      const [h, m] = time24.split(':');
+      const hours = parseInt(h, 10);
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      return `${hours % 12 || 12}:${m} ${ampm}`;
+    };
+
+    let text = `${subject} Coverage Schedule\n\n`;
+
+    if (subjectShifts.length === 0) {
+      text += "No coverage scheduled this week.\n";
+    } else {
+      const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      ALL_DAYS.forEach(day => {
+        const dayShifts = subjectShifts.filter((s: any) => s.day === day);
+        if (dayShifts.length > 0) {
+          text += `${day}:\n`;
+          dayShifts.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
+          
+          dayShifts.forEach((shift: any) => {
+            const tutor = activeRoster.find((t: any) => t.id === shift.tutorId);
+            const tutorName = tutor ? tutor.name : 'Unknown Educator';
+            const role = tutor && tutor.role ? tutor.role : 'Tutor';
+            text += `- ${formatTime(shift.startTime)} to ${formatTime(shift.endTime)} (${tutorName}, ${role})\n`;
+          });
+          text += '\n';
+        }
+      });
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text.trim();
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy subject schedule', err);
+    }
+    document.body.removeChild(textArea);
+  };
 
   return (
     <div 
@@ -267,13 +321,33 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <h3 style={{ marginTop: 0, color: '#0f172a' }}>📚 {subject}</h3>
-        <span 
-          onClick={() => setSelectedSubjectModal(subject)}
-          style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
-        >
-          ↗
-        </span>
+        
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          
+          {/* --- COPY BUTTON --- */}
+          <button
+            onClick={handleCopySubject}
+            style={{ 
+              background: 'none', border: 'none', 
+              color: isCopied ? '#10b981' : '#64748b', 
+              cursor: 'pointer', fontSize: '1.1rem',
+              opacity: (isHovered || isCopied) ? 1 : 0, 
+              transition: 'all 0.2s', padding: 0
+            }}
+            title={`Copy ${subject} Coverage to Clipboard`}
+          >
+            {isCopied ? '✅' : '📋'}
+          </button>
+          
+          <span 
+            onClick={() => setSelectedSubjectModal(subject)}
+            style={{ color: isHovered ? '#10b981' : '#cbd5e1', fontSize: '1.2rem', transition: 'color 0.2s', cursor: 'pointer' }}
+          >
+            ↗
+          </span>
+        </div>
       </div>
+      
       <div style={{ flexGrow: 1, marginTop: '1rem' }}>
         {subjectShifts.length === 0 ? (
           <p style={{ color: '#ef4444', fontWeight: 'bold', margin: 0 }}>⚠️ No coverage this week!</p>
@@ -288,6 +362,11 @@ function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, setHover
                   <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
                   {dayShifts.map((block: any, index: number) => {
                     const tutorName = activeRoster.find((t: any) => t.id === block.tutorId)?.name || 'Unknown';
+                    const format12Hour = (time24: string) => {
+                       const [h, m] = time24.split(':');
+                       const hours = parseInt(h, 10);
+                       return `${hours % 12 || 12}:${m} ${hours >= 12 ? 'PM' : 'AM'}`;
+                    };
                     return (
                       <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
                         {format12Hour(block.startTime)} - {format12Hour(block.endTime)}: <span style={{ color: '#3b82f6', fontWeight: '500' }}>{tutorName}</span>

@@ -11,6 +11,9 @@ import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
 import { AdminCoursesPage } from './components/AdminCoursesPage';
 import { ScheduleGenerationPage } from './components/ScheduleGenerationPage';
 import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -626,6 +629,7 @@ function App() {
 
   const [subjectSearchQuery, setSubjectSearchQuery] = useState('');
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const hasUnsavedChanges = schedule.length > 0 && activeScheduleMeta === null;
 
@@ -734,48 +738,6 @@ function App() {
       alert("Failed to save schedule.");
     }
   };
-
-  // --- NEW: CSV Export Function ---
-  const handleExportCSV = () => {
-    // 1. Create the CSV Header row
-    let csvContent = "Day,Start Time,End Time,Educator Name,Role,Subjects\n";
-
-    const mergedShifts = getMergedWeeklySchedule(schedule);
-
-    // 2. Sort the schedule chronologically so the CSV is easy to read
-    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const sortedShifts = [...mergedShifts].sort((a, b) => {
-      if (a.day !== b.day) return ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day);
-      return a.startTime.localeCompare(b.startTime);
-    });
-
-    // 3. Loop through and build the rows
-    sortedShifts.forEach(shift => {
-      // Cross-reference data
-      const tutor = activeRoster.find(t => t.id === shift.tutorId);
-      const tutorName = tutor ? tutor.name : 'Unknown';
-      const role = tutor && (tutor as any).role ? (tutor as any).role : 'Tutor';
-      
-      const start = format12Hour(shift.startTime);
-      const end = format12Hour(shift.endTime);
-      
-      // Join subjects with a pipe (|) so the commas don't break the CSV columns!
-      const subjects = shift.subjects.join(" | ");
-
-      // 4. Append row (wrapped in quotes to prevent spacing errors in Excel)
-      csvContent += `"${shift.day}","${start}","${end}","${tutorName}","${role}","${subjects}"\n`;
-    });
-
-    // 5. Trigger the hidden browser download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'master_schedule.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link); // Clean up
-  };
   
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
@@ -871,6 +833,71 @@ function App() {
   return matchesName && matchesSubject && matchesNight && matchesWeekend;
 });
 
+// --- EXPORT LOGIC ---
+  const getExportData = () => {
+    const mergedShifts = getMergedWeeklySchedule(schedule);
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const sortedShifts = [...mergedShifts].sort((a, b) => {
+      if (a.day !== b.day) return ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day);
+      return a.startTime.localeCompare(b.startTime);
+    });
+
+    return sortedShifts.map(shift => {
+      const tutor = activeRoster.find(t => t.id === shift.tutorId);
+      return {
+        Day: shift.day,
+        'Start Time': format12Hour(shift.startTime),
+        'End Time': format12Hour(shift.endTime),
+        'Educator Name': tutor ? tutor.name : 'Unknown',
+        Role: tutor && (tutor as any).role ? (tutor as any).role : 'Tutor',
+        Subjects: shift.subjects.join(" | ")
+      };
+    });
+  };
+
+  const handleExportCSV = () => {
+    const data = getExportData();
+    let csvContent = "Day,Start Time,End Time,Educator Name,Role,Subjects\n";
+    data.forEach(row => {
+      csvContent += `"${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}","${row.Subjects}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'master_schedule.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExcel = () => {
+    const data = getExportData();
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Schedule");
+    XLSX.writeFile(workbook, "master_schedule.xlsx");
+  };
+
+  const handleExportPDF = () => {
+    const data = getExportData();
+    const doc = new jsPDF();
+    
+    doc.text("Master Coverage Schedule", 14, 15);
+    
+    const tableData = data.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role, row.Subjects]);
+    
+    autoTable(doc, {
+      head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role', 'Subjects']],
+      body: tableData,
+      startY: 20,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [16, 185, 129] } // Matches the app's green theme
+    });
+
+    doc.save("master_schedule.pdf");
+  };
+  
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
     
@@ -957,22 +984,71 @@ function App() {
                       <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>💾 Save to Database</button>
                     )}
 
-                     {/* CSV Export Button */}
-                  <button 
-                    onClick={handleExportCSV}
-                    style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
-                    title="Download Schedule for Excel/Google Sheets"
-                  >
-                    {/* Modern Download SVG */}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Export CSV
-                  </button>
+                    {/* --- NEW EXPORT MENU --- */}
+                    <div style={{ position: 'relative' }}>
+                      <button 
+                        onClick={() => setShowExportModal(!showExportModal)} 
+                        style={{ 
+                          padding: '0.5rem 1rem', 
+                          backgroundColor: '#3b82f6', // A nice blue to differentiate from the green save button
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '4px', 
+                          cursor: 'pointer', 
+                          fontWeight: 'bold', 
+                          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                      >
+                        📤 Export ▾
+                      </button>
+
+                      {showExportModal && (
+                        <div style={{ 
+                          position: 'absolute', 
+                          top: '100%', 
+                          left: '50%', 
+                          transform: 'translateX(-50%)', 
+                          marginTop: '0.5rem', 
+                          backgroundColor: 'white', 
+                          border: '1px solid #e2e8f0', 
+                          borderRadius: '8px', 
+                          boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+                          zIndex: 50, 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          overflow: 'hidden', 
+                          minWidth: '160px' 
+                        }}>
+                          <button 
+                            onClick={() => { handleExportCSV(); setShowExportModal(false); }} 
+                            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            📄 CSV File
+                          </button>
+                          <button 
+                            onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
+                            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            📊 Excel (.xlsx)
+                          </button>
+                          <button 
+                            onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
+                            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            📕 PDF Document
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     {missingTutors.length > 0 && (
                       <select 

@@ -735,10 +735,48 @@ function App() {
     }
   };
 
-  // 1. Add this state near your other useState declarations at the top of App
+  // --- NEW: CSV Export Function ---
+  const handleExportCSV = () => {
+    // 1. Create the CSV Header row
+    let csvContent = "Day,Start Time,End Time,Educator Name,Role,Subjects\n";
+
+    // 2. Sort the schedule chronologically so the CSV is easy to read
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const sortedShifts = [...schedule].sort((a, b) => {
+      if (a.day !== b.day) return ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day);
+      return a.startTime.localeCompare(b.startTime);
+    });
+
+    // 3. Loop through and build the rows
+    sortedShifts.forEach(shift => {
+      // Cross-reference data
+      const tutor = activeRoster.find(t => t.id === shift.tutorId);
+      const tutorName = tutor ? tutor.name : 'Unknown';
+      const role = tutor && (tutor as any).role ? (tutor as any).role : 'Tutor';
+      
+      const start = format12Hour(shift.startTime);
+      const end = format12Hour(shift.endTime);
+      
+      // Join subjects with a pipe (|) so the commas don't break the CSV columns!
+      const subjects = shift.subjects.join(" | ");
+
+      // 4. Append row (wrapped in quotes to prevent spacing errors in Excel)
+      csvContent += `"${shift.day}","${start}","${end}","${tutorName}","${role}","${subjects}"\n`;
+    });
+
+    // 5. Trigger the hidden browser download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'master_schedule.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link); // Clean up
+  };
+  
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
-  // 2. Add this helper function somewhere before your return statement
   const handleCopySchedule = (tutor: any, tutorShifts: any[], totalHours: number, e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -943,9 +981,45 @@ function App() {
                 </div>
                 
                 <hr style={{ margin: '1rem 0 2rem 0' }} />
-
-                <SectionHeader title="Peer Educator Breakdowns" isOpen={isTutorsOpen} onToggle={() => setIsTutorsOpen(!isTutorsOpen)} />
                 
+                {/* --- UPDATED: Header wrapped in flex to hold Export Button --- */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ flexGrow: 1 }}>
+                    <SectionHeader title="Peer Educator Breakdowns" isOpen={isTutorsOpen} onToggle={() => setIsTutorsOpen(!isTutorsOpen)} />
+                  </div>
+                  
+                  {/* CSV Export Button */}
+                  <button 
+                    onClick={handleExportCSV}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.5rem',
+                      backgroundColor: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.4)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+                    title="Download Schedule for Excel/Google Sheets"
+                  >
+                    {/* Modern Download SVG */}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export CSV
+                  </button>
+                </div>
+
                 {isTutorsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
                     {/* --- Expanded Filter Controls --- */}

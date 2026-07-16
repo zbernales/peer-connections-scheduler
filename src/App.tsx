@@ -740,9 +740,11 @@ function App() {
     // 1. Create the CSV Header row
     let csvContent = "Day,Start Time,End Time,Educator Name,Role,Subjects\n";
 
+    const mergedShifts = getMergedWeeklySchedule(schedule);
+
     // 2. Sort the schedule chronologically so the CSV is easy to read
     const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const sortedShifts = [...schedule].sort((a, b) => {
+    const sortedShifts = [...mergedShifts].sort((a, b) => {
       if (a.day !== b.day) return ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day);
       return a.startTime.localeCompare(b.startTime);
     });

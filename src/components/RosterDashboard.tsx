@@ -3,6 +3,9 @@ import { db } from '../firebase';
 import { TutorForm } from './TutorForm';
 import type { Tutor } from '../types';
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface RosterDashboardProps {
   roster: Tutor[];
@@ -16,15 +19,16 @@ const ROLE_COLORS: Record<string, { bg: string, text: string }> = {
   'Mentor': { bg: '#dcfce7', text: '#15803d' },      // Light Green
 };
 
-export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps) { 
+export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps) {
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
-  
+  const [showExportModal, setShowExportModal] = useState(false);
+
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
 
   const handleDelete = async (tutorId: string, tutorName: string, e: React.MouseEvent) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (window.confirm(`Are you sure you want to permanently delete ${tutorName}?`)) {
       try {
         await deleteDoc(doc(db, 'tutors', tutorId));
@@ -56,11 +60,104 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
   const handleSaveEdit = async (updatedTutorData: any) => {
     try {
       await updateDoc(doc(db, 'tutors', updatedTutorData.id), updatedTutorData);
-      setEditingTutor(null); 
+      setEditingTutor(null);
     } catch (error) {
       console.error("Error updating tutor:", error);
       alert("Failed to update tutor.");
     }
+  };
+
+  // --- ROSTER EXPORT LOGIC ---
+  const getRosterExportData = () => {
+    // 1. Sort roster alphabetically by name first
+    const sortedRoster = [...roster].sort((a, b) => a.name.localeCompare(b.name));
+
+    return sortedRoster.map(tutor => {
+      const role = (tutor as any).role || 'Tutor';
+      
+      // 2. Check for weekend availability
+      const hasWeekends = tutor.availability?.some(s => s.day === 'Saturday' || s.day === 'Sunday') ? 'Yes' : 'No';
+      
+      // 3. Check for night availability (Mon-Fri, end time after 17:00 / 5:00 PM)
+      const hasNights = tutor.availability?.some(s => {
+        if (s.day === 'Saturday' || s.day === 'Sunday') return false;
+        const [hours, mins] = s.endTime.split(':').map(Number);
+        return hours + (mins / 60) > 17; 
+      }) ? 'Yes' : 'No';
+
+      return {
+        Name: tutor.name,
+        Role: role,
+        'Min Hours': tutor.minHours,
+        'Max Hours': tutor.maxHours,
+        'Night Availability': hasNights,
+        'Weekend Availability': hasWeekends,
+        'Subject Count': tutor.subjects.length,
+        'Subjects': tutor.subjects.join(" | ")
+      };
+    });
+  };
+
+  const handleExportCSV = () => {
+    const data = getRosterExportData();
+    let csvContent = "Name,Role,Min Hours,Max Hours,Night Availability,Weekend Availability,Subject Count,Subjects\n";
+
+    data.forEach(row => {
+      csvContent += `"${row.Name}","${row.Role}","${row['Min Hours']}","${row['Max Hours']}","${row['Night Availability']}","${row['Weekend Availability']}","${row['Subject Count']}","${row.Subjects}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'educator_roster.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExcel = () => {
+    const data = getRosterExportData();
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Educator Roster");
+    XLSX.writeFile(workbook, "educator_roster.xlsx");
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Peer Educator Roster", 14, 20);
+
+    let currentY = 30;
+    const data = getRosterExportData();
+
+    // We use a custom loop here instead of autoTable to create the "Profile" look
+    data.forEach(row => {
+      if (currentY > 260) {
+        doc.addPage();
+        currentY = 20;
+      }
+      
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${row.Name} (${row.Role})`, 14, currentY);
+      
+      currentY += 7;
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Target Hours: ${row['Min Hours']} - ${row['Max Hours']} hrs/week | Nights: ${row['Night Availability']} | Weekends: ${row['Weekend Availability']}`, 14, currentY);
+      
+      currentY += 6;
+      // Replace the standard pipes with commas so it reads like a standard sentence
+      const subjectsText = `Subjects Supported (${row['Subject Count']}): ${row.Subjects.replace(/ \| /g, ', ')}`;
+      const splitSubjects = doc.splitTextToSize(subjectsText, 180);
+      doc.text(splitSubjects, 14, currentY);
+      
+      // Add dynamic padding based on how many lines of subjects there were
+      currentY += (splitSubjects.length * 6) + 8; 
+    });
+
+    doc.save("educator_roster.pdf");
   };
 
   // Combined Filtering Logic
@@ -77,7 +174,47 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1.8rem' }}>Peer Educator Roster ({filteredRoster.length})</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          
+          {/* --- NEW EXPORT MENU --- */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setShowExportModal(!showExportModal)} 
+              style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              📤 Export Roster ▾
+            </button>
+
+            {showExportModal && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 50, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: '160px' }}>
+                <button 
+                  onClick={() => { handleExportCSV(); setShowExportModal(false); }} 
+                  style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  📄 CSV File
+                </button>
+                <button 
+                  onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
+                  style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  📊 Excel (.xlsx)
+                </button>
+                <button 
+                  onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
+                  style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  📕 PDF Document
+                </button>
+              </div>
+            )}
+          </div>
+
           <button onClick={handleResetRoster} style={{ padding: '0.5rem 1.5rem', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #f87171', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
         </div>
       </div>

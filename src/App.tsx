@@ -1009,7 +1009,7 @@ function App() {
     doc.save("subject_coverage.pdf");
   };
   
-  // --- EDUCATOR SCHEDULE EXPORT LOGIC ("TIMESHEET" & "ITINERARY") ---
+ // --- EDUCATOR SCHEDULE EXPORT LOGIC ("TIMESHEET" & "ITINERARY") ---
 const getEducatorTimesheetData = () => {
   // 1. Get the cleanly merged shifts (prevents overlapping 30min blocks)
   const mergedShifts = getMergedWeeklySchedule(schedule);
@@ -1133,32 +1133,48 @@ const handleExportEducatorPDF = () => {
       const tutorShifts = mergedShifts.filter((s: any) => s.tutorId === tutor.id);
       if (tutorShifts.length === 0) return;
 
-      const totalHours = tutorShifts.reduce((sum, shift) => sum + (timeToFloat(shift.endTime) - timeToFloat(shift.startTime)), 0);
-
       // --- Print Educator Name ---
       if (currentY > 260) { doc.addPage(); currentY = 20; }
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text(`${tutor.name} (Total: ${totalHours.toFixed(1)} hrs)`, 14, currentY);
+      // Removed total hours to match requested clean look
+      doc.text(`${tutor.name}`, 14, currentY);
       currentY += 6;
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      
-      tutorShifts.sort((a: any, b: any) => {
-        if (a.day !== b.day) return ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day);
-        return a.startTime.localeCompare(b.startTime);
+      // Group shifts by day for a cleaner format
+      const shiftsByDay: Record<string, any[]> = {};
+      tutorShifts.forEach((shift: any) => {
+        if (!shiftsByDay[shift.day]) shiftsByDay[shift.day] = [];
+        shiftsByDay[shift.day].push(shift);
       });
 
-      // --- Print Shifts ---
-      tutorShifts.forEach((shift: any) => {
-        if (currentY > 275) { doc.addPage(); currentY = 20; }
-        doc.text(`• ${shift.day}: ${format12Hour(shift.startTime)} - ${format12Hour(shift.endTime)}`, 18, currentY);
-        currentY += 5;
+      // --- Print Shifts (Grouped by Day) ---
+      ALL_DAYS.forEach(day => {
+        const dayShifts = shiftsByDay[day];
+        if (dayShifts && dayShifts.length > 0) {
+          if (currentY > 270) { doc.addPage(); currentY = 20; }
+          
+          // Print Day Header (e.g., "Monday")
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.text(day, 18, currentY);
+          currentY += 5;
+
+          // Print Times for that day (e.g., "9:00 AM - 11:00 AM")
+          doc.setFont("helvetica", "normal");
+          dayShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+          dayShifts.forEach(shift => {
+            if (currentY > 275) { doc.addPage(); currentY = 20; }
+            doc.text(`${format12Hour(shift.startTime)} - ${format12Hour(shift.endTime)}`, 18, currentY);
+            currentY += 5;
+          });
+          currentY += 2; // Small gap between days
+        }
       });
 
       // --- Print Subjects ---
       if (currentY > 275) { doc.addPage(); currentY = 20; }
+      doc.setFontSize(10);
       doc.setFont("helvetica", "italic");
       const subjectsText = `Subjects: ${tutor.subjects.join(', ')}`;
       const splitSubjects = doc.splitTextToSize(subjectsText, 170);
@@ -1348,7 +1364,35 @@ const handleExportEducatorPDF = () => {
                           </button>
 
                           <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
-
+                          
+                          {/* SECTION: EDUCATOR BREAKDOWNS */}
+                          <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
+                            Educator Breakdowns
+                          </div>
+                          <button 
+                            onClick={() => { handleExportEducatorCSV(); setShowExportModal(false); }} 
+                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            📄 CSV File
+                          </button>
+                          <button 
+                            onClick={() => { handleExportEducatorExcel(); setShowExportModal(false); }} 
+                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            📊 Excel (.xlsx)
+                          </button>
+                          <button 
+                            onClick={() => { handleExportEducatorPDF(); setShowExportModal(false); }} 
+                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            📕 PDF Document
+                          </button>
                           {/* SECTION: SUBJECT COVERAGE */}
                           <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
                             Subject Coverage
@@ -1379,35 +1423,6 @@ const handleExportEducatorPDF = () => {
                           </button>
 
                           <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
-
-                          {/* SECTION: EDUCATOR BREAKDOWNS */}
-                          <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
-                            Educator Breakdowns
-                          </div>
-                          <button 
-                            onClick={() => { handleExportEducatorCSV(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📄 Timesheet CSV
-                          </button>
-                          <button 
-                            onClick={() => { handleExportEducatorExcel(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📊 Timesheet Excel
-                          </button>
-                          <button 
-                            onClick={() => { handleExportEducatorPDF(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📕 Individual Itineraries
-                          </button>
 
                       </div>
                     )}

@@ -360,7 +360,7 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
       
       <div style={{ flexGrow: 1, marginTop: '1rem' }}>
         {subjectShifts.length === 0 ? (
-          <p style={{ color: '#ef4444', fontWeight: 'bold', margin: 0 }}>⚠️ No coverage this week!</p>
+          <p style={{ color: '#ef4444', fontWeight: 'bold', margin: 0 }}>No coverage scheduled</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', color: '#475569' }}>
             {DAYS.map(day => {
@@ -897,6 +897,118 @@ function App() {
 
     doc.save("master_schedule.pdf");
   };
+
+  // --- SUBJECT EXPORT LOGIC ---
+  const getSubjectExportData = () => {
+    // 1. Get the cleanly merged shifts
+    const mergedShifts = getMergedWeeklySchedule(schedule);
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    // 2. "Unroll" the data so a shift covering 3 subjects becomes 3 rows
+    const unrolledData: any[] = [];
+
+    mergedShifts.forEach((shift: any) => {
+      const tutor = activeRoster.find(t => t.id === shift.tutorId);
+      const tutorName = tutor ? tutor.name : 'Unknown';
+      const role = tutor && (tutor as any).role ? (tutor as any).role : 'Tutor';
+      const start = format12Hour(shift.startTime);
+      const end = format12Hour(shift.endTime);
+
+      shift.subjects.forEach((subject: string) => {
+        unrolledData.push({
+          Subject: subject,
+          Day: shift.day,
+          'Start Time': start,
+          'End Time': end,
+          'Educator Name': tutorName,
+          Role: role,
+          _rawStart: shift.startTime // kept for accurate sorting
+        });
+      });
+
+    });
+
+    // 3. Sort by Subject first, then Day, then Time
+    return unrolledData.sort((a, b) => {
+      if (a.Subject !== b.Subject) return a.Subject.localeCompare(b.Subject);
+      if (a.Day !== b.Day) return ALL_DAYS.indexOf(a.Day) - ALL_DAYS.indexOf(b.Day);
+      return a._rawStart.localeCompare(b._rawStart);
+    });
+  };
+
+  const handleExportSubjectCSV = () => {
+    const data = getSubjectExportData();
+    let csvContent = "Subject,Day,Start Time,End Time,Educator Name,Role\n";
+
+    data.forEach(row => {
+      csvContent += `"${row.Subject}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'subject_coverage.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportSubjectExcel = () => {
+    const data = getSubjectExportData();
+
+    // Remove the hidden _rawStart field before generating Excel
+    const cleanData = data.map(({ _rawStart, ...rest }) => rest);
+
+    const worksheet = XLSX.utils.json_to_sheet(cleanData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Subject Coverage");
+    XLSX.writeFile(workbook, "subject_coverage.xlsx");
+  };
+
+  const handleExportSubjectPDF = () => {
+    const data = getSubjectExportData();
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("Subject Coverage Report", 14, 15);
+
+    // Get unique subjects to group the tables
+    const uniqueSubjects = Array.from(new Set(data.map(item => item.Subject)));
+
+    let currentY = 25;
+
+    uniqueSubjects.forEach(subject => {
+      const subjectData = data.filter(item => item.Subject === subject);
+      const tableData = subjectData.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role]);
+
+      doc.setFontSize(12);
+      
+      // FIXED: Using standard string concatenation to avoid syntax errors
+      doc.text("Subject: " + subject, 14, currentY);
+
+      autoTable(doc, {
+        head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role']],
+        body: tableData,
+        startY: currentY + 4,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [59, 130, 246] }, // A nice blue for subjects
+        margin: { bottom: 20 }
+      });
+
+      // Calculate where the next table should start
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+
+      // If we are getting too close to the bottom of the page, add a new page
+      if (currentY > 270) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+    });
+
+    doc.save("subject_coverage.pdf");
+  };
+  
   
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
@@ -986,74 +1098,106 @@ function App() {
 
                     {/* --- NEW EXPORT MENU --- */}
                     <div style={{ position: 'relative' }}>
-                      <button 
-                        onClick={() => setShowExportModal(!showExportModal)} 
-                        style={{ 
-                          padding: '0.5rem 1rem', 
-                          backgroundColor: '#3b82f6', // A nice blue to differentiate from the green save button
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: '4px', 
-                          cursor: 'pointer', 
-                          fontWeight: 'bold', 
-                          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem'
-                        }}
-                      >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                        Export ▾
-                      </button>
+                    <button 
+                      onClick={() => setShowExportModal(!showExportModal)} 
+                      style={{ 
+                        padding: '0.5rem 1rem', 
+                        backgroundColor: '#3b82f6', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer', 
+                        fontWeight: 'bold', 
+                        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      📤 Export ▾
+                    </button>
 
-                      {showExportModal && (
-                        <div style={{ 
-                          position: 'absolute', 
-                          top: '100%', 
-                          left: '50%', 
-                          transform: 'translateX(-50%)', 
-                          marginTop: '0.5rem', 
-                          backgroundColor: 'white', 
-                          border: '1px solid #e2e8f0', 
-                          borderRadius: '8px', 
-                          boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
-                          zIndex: 50, 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          overflow: 'hidden', 
-                          minWidth: '160px' 
-                        }}>
-                          <button 
-                            onClick={() => { handleExportCSV(); setShowExportModal(false); }} 
-                            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📄 CSV File
-                          </button>
-                          <button 
-                            onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
-                            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📊 Excel (.xlsx)
-                          </button>
-                          <button 
-                            onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
-                            style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📕 PDF Document
-                          </button>
+                    {showExportModal && (
+                      <div style={{ 
+                        position: 'absolute', 
+                        top: '100%', 
+                        left: '50%', 
+                        transform: 'translateX(-50%)', 
+                        marginTop: '0.5rem', 
+                        backgroundColor: 'white', 
+                        border: '1px solid #e2e8f0', 
+                        borderRadius: '8px', 
+                        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+                        zIndex: 50, 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        overflow: 'hidden', 
+                        minWidth: '200px' 
+                      }}>
+                        
+                        {/* SECTION: MASTER SCHEDULE */}
+                        <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
+                          Master Schedule
                         </div>
-                      )}
-                    </div>
+                        <button 
+                          onClick={() => { handleExportCSV(); setShowExportModal(false); }} 
+                          style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📄 CSV File
+                        </button>
+                        <button 
+                          onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
+                          style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📊 Excel (.xlsx)
+                        </button>
+                        <button 
+                          onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
+                          style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📕 PDF Document
+                        </button>
+
+                        <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
+
+                        {/* SECTION: SUBJECT COVERAGE */}
+                        <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
+                          Subject Coverage
+                        </div>
+                        <button 
+                          onClick={() => { handleExportSubjectCSV(); setShowExportModal(false); }} 
+                          style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📄 CSV File
+                        </button>
+                        <button 
+                          onClick={() => { handleExportSubjectExcel(); setShowExportModal(false); }} 
+                          style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📊 Excel (.xlsx)
+                        </button>
+                        <button 
+                          onClick={() => { handleExportSubjectPDF(); setShowExportModal(false); }} 
+                          style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📕 PDF Document
+                        </button>
+
+                      </div>
+                    )}
+                  </div>
 
                     {missingTutors.length > 0 && (
                       <select 

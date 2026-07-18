@@ -598,7 +598,10 @@ function App() {
   };
 
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
-  const [activeRoster, setActiveRoster] = useState<Tutor[]>([]); 
+  const [activeRoster, setActiveRoster] = useState<Tutor[]>(() => {
+    const saved = localStorage.getItem('activeRoster');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [isTutorsOpen, setIsTutorsOpen] = useState(true);
   const [isHeatmapOpen, setIsHeatmapOpen] = useState(true);
@@ -617,8 +620,15 @@ function App() {
     maxHoursPerWeek: 6
   });
 
-  const [schedule, setSchedule] = useState<Shift[]>([]);
-  const [activeScheduleMeta, setActiveScheduleMeta] = useState<{id: string, name: string} | null>(null);
+  const [schedule, setSchedule] = useState<Shift[]>(() => {
+    const saved = localStorage.getItem('activeSchedule');
+    return saved ? JSON.parse(saved) : [];
+  });
+ const [activeScheduleMeta, setActiveScheduleMeta] = useState<{id: string, name: string} | null>(() => {
+    const saved = localStorage.getItem('activeScheduleMeta');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [saveStatus, setSaveStatus] = useState<string>('');
 
   const [tutorSearchQuery, setTutorSearchQuery] = useState(''); 
@@ -644,6 +654,31 @@ function App() {
     setExpandedDepartments(new Set());
   };
 
+   // --- LOCAL STORAGE BACKUP HOOKS ---
+  useEffect(() => {
+    if (activeRoster.length > 0) {
+      localStorage.setItem('activeRoster', JSON.stringify(activeRoster));
+    } else {
+      localStorage.removeItem('activeRoster');
+    }
+  }, [activeRoster]);
+
+  useEffect(() => {
+    if (schedule.length > 0) {
+      localStorage.setItem('activeSchedule', JSON.stringify(schedule));
+    } else {
+      localStorage.removeItem('activeSchedule');
+    }
+  }, [schedule]);
+
+  useEffect(() => {
+    if (activeScheduleMeta) {
+      localStorage.setItem('activeScheduleMeta', JSON.stringify(activeScheduleMeta));
+    } else {
+      localStorage.removeItem('activeScheduleMeta');
+    }
+  }, [activeScheduleMeta]);
+  
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {

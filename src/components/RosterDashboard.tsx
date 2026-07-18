@@ -223,13 +223,23 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
 
       {/* Filters Container */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'center' }}>
-        <input 
-          type="text" 
-          placeholder="🔍 Search peer educators by name..." 
-          value={searchQuery} 
-          onChange={(e) => setSearchQuery(e.target.value)} 
-          style={{ flex: 1, padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} 
-        />
+        {/* Modern Search Input Wrapper */}
+        <div style={{ position: 'relative', flex: 1 }}>
+          {/* SVG Search Icon */}
+          <div style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </div>
+          
+          <input 
+            type="text" 
+            placeholder="Search peer educators by name..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            style={{ width: '100%', padding: '0.85rem 1rem 0.85rem 2.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.05rem', boxSizing: 'border-box' }} 
+          />
+        </div>
         <select 
           value={roleFilter} 
           onChange={(e) => setRoleFilter(e.target.value)} 

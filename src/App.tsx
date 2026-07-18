@@ -1459,15 +1459,26 @@ const handleExportEducatorPDF = () => {
 
                 {isTutorsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
-                    {/* --- Expanded Filter Controls --- */}
-                    <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  {/* --- Expanded Filter Controls --- */}
+                  <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    
+                    {/* Modern Search Input Wrapper */}
+                    <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
+                      {/* SVG Search Icon */}
+                      <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                      </div>
+
                       <input 
                         type="text" 
-                        placeholder="🔍 Search for a specific peer educator..." 
+                        placeholder="Search for a specific peer educator..." 
                         value={tutorSearchQuery}
                         onChange={(e) => setTutorSearchQuery(e.target.value)}
-                        style={{ flex: 1, minWidth: '250px', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        style={{ width: '100%', padding: '1rem 1rem 1rem 2.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}
                       />
+                    </div>
                       
                       <select
                         value={tutorSubjectFilter}
@@ -1683,15 +1694,22 @@ const handleExportEducatorPDF = () => {
 
                 {isSubjectsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
-                    <div style={{ marginBottom: '1.5rem' }}>
-                      <input 
-                        type="text" 
-                        placeholder="🔍 Search for a specific class (e.g., CS 146, Math)..." 
-                        value={subjectSearchQuery}
-                        onChange={(e) => setSubjectSearchQuery(e.target.value)}
-                        style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                      />
+                  <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
+                    {/* SVG Search Icon */}
+                    <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                      </svg>
                     </div>
+
+                    <input 
+                      type="text" 
+                      placeholder="Search for a specific class (e.g., CS 146, Math)..." 
+                      value={subjectSearchQuery}
+                      onChange={(e) => setSubjectSearchQuery(e.target.value)}
+                      style={{ width: '100%', padding: '1rem 1rem 1rem 2.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1.1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}
+                    />
+                  </div>
 
                     {subjectSearchQuery ? (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem', paddingBottom: '3rem' }}>

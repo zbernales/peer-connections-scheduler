@@ -175,7 +175,7 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
 
         <div>
           <label><strong>Name:<span style={{color: "red"}}> * </span></strong></label><br/>
-          <input required value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} placeholder="e.g., Jane Doe" />
+          <input required value={name} onChange={e => setName(e.target.value)} style={{ width: '98%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} placeholder="e.g., Jane Doe" />
         </div>
         
         <div>

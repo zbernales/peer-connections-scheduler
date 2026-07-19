@@ -330,7 +330,7 @@ export const AdminCoursesPage: React.FC = () => {
           
           <input 
             type="text" 
-            placeholder="Search peer educators by name..." 
+            placeholder="Search courses by code or name..." 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
             style={{ width: '100%', padding: '0.75rem 1rem 0.85rem 2.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', boxSizing: 'border-box' }} 

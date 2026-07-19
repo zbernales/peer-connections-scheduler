@@ -44,7 +44,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate }: S
             boxShadow: isGenerateDisabled ? 'none' : '0 4px 6px -1px rgba(16, 185, 129, 0.4)' 
           }}
         >
-          Generate Master Schedule
+          Generate Schedule
         </button>
       </div>
 
@@ -157,14 +157,81 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate }: S
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Max Consecutive Hours</label>
-            <input type="number" min="0.5" step="0.5" value={config.maxConsecutiveHours} onChange={e => onConfigChange({...config, maxConsecutiveHours: Number(e.target.value)})} style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '1rem' }} />
-          </div>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '0.95rem',
+              marginBottom: '0.5rem',
+              fontWeight: 'bold',
+            }}
+          >
+            Max Hours Per Shift
+          </label>
+          <input
+            type="number"
+            min="0.5"
+            step="0.5"
+            value={config.maxConsecutiveHours}
+            onChange={(e) => {
+              const value = Math.max(
+                Number(e.target.value),
+                config.minHoursPerShift || 0.5
+              );
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Min Hours Per Shift</label>
-            <input type="number" min="0.5" step="0.5" value={config.minHoursPerShift || 0.5} onChange={e => onConfigChange({...config, minHoursPerShift: Number(e.target.value)})} style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '1rem' }} />
-          </div>
+              onConfigChange({
+                ...config,
+                maxConsecutiveHours: value,
+              });
+            }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              boxSizing: 'border-box',
+              fontSize: '1rem',
+            }}
+          />
+        </div>
+
+        <div>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '0.95rem',
+              marginBottom: '0.5rem',
+              fontWeight: 'bold',
+            }}
+          >
+            Min Hours Per Shift
+          </label>
+          <input
+            type="number"
+            min="0.5"
+            max={config.maxConsecutiveHours}
+            step="0.5"
+            value={config.minHoursPerShift || 0.5}
+            onChange={(e) => {
+              const value = Math.min(
+                Number(e.target.value),
+                config.maxConsecutiveHours
+              );
+
+              onConfigChange({
+                ...config,
+                minHoursPerShift: value,
+              });
+            }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              boxSizing: 'border-box',
+              fontSize: '1rem',
+            }}
+          />
+        </div>
           
           <div>
             <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Min Break/Cooldown Hours</label>

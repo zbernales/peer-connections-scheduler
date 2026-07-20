@@ -750,14 +750,14 @@ function App() {
     setSelectedTutorModal(null); 
   };
 
-  const handleSaveAsNew = async () => {
+    const handleSaveAsNew = async (): Promise<string | null> => {
     if (schedule.length === 0) {
       alert("There is no schedule to save! Generate one first.");
-      return;
+      return null;
     }
 
     const scheduleName = window.prompt("Enter a name for this schedule:");
-    if (!scheduleName) return; 
+    if (!scheduleName) return null; 
 
     try {
       const docRef = await addDoc(collection(db, 'schedules'), {
@@ -768,11 +768,14 @@ function App() {
       });
       setActiveScheduleMeta({ id: docRef.id, name: scheduleName });
       alert(`"${scheduleName}" has been securely saved to the database!`);
+      return scheduleName;
     } catch (error) {
       console.error("Error saving schedule:", error);
       alert("Failed to save schedule.");
+      return null;
     }
   };
+
   
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
@@ -868,6 +871,22 @@ function App() {
   return matchesName && matchesSubject && matchesNight && matchesWeekend;
 });
 
+ // --- NEW: EXPORT WRAPPER ---
+  const executeExport = async (exportFn: (safeName: string, rawName: string) => void) => {
+    setShowExportModal(false);
+    let sName: string | undefined | null = activeScheduleMeta?.name; // <-- Add explicit type here
+
+    if (!sName) {
+      alert("Please save and name this schedule before exporting.");
+      sName = await handleSaveAsNew();
+      if (!sName) return; // User cancelled or failed to save
+    }
+
+    // Create a safe, URL-friendly filename (e.g. "Fall 2026!" -> "fall_2026")
+    const safeName = sName.replace(/[^a-z0-9]+/gi, '_').replace(/(^_|_$)/g, '').toLowerCase();
+    exportFn(safeName, sName);
+  };
+
 // --- EXPORT LOGIC ---
   const getExportData = () => {
     const mergedShifts = getMergedWeeklySchedule(schedule);
@@ -890,7 +909,7 @@ function App() {
     });
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (safeName: string) => {
     const data = getExportData();
     let csvContent = "Day,Start Time,End Time,Educator Name,Role,Subjects\n";
     data.forEach(row => {
@@ -900,37 +919,33 @@ function App() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'master_schedule.csv');
+    link.setAttribute('download', `${safeName}_master_schedule.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = (safeName: string) => {
     const data = getExportData();
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Schedule");
-    XLSX.writeFile(workbook, "master_schedule.xlsx");
+    XLSX.writeFile(workbook, `${safeName}_master_schedule.xlsx`);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = (safeName: string, rawName: string) => {
     const data = getExportData();
     const doc = new jsPDF();
-    
-    doc.text("Master Coverage Schedule", 14, 15);
-    
+    doc.text(`${rawName} - Master Schedule`, 14, 15);
     const tableData = data.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role, row.Subjects]);
-    
     autoTable(doc, {
       head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role', 'Subjects']],
       body: tableData,
       startY: 20,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [16, 185, 129] } // Matches the app's green theme
+      headStyles: { fillColor: [16, 185, 129] }
     });
-
-    doc.save("master_schedule.pdf");
+    doc.save(`${safeName}_master_schedule.pdf`);
   };
 
   // --- SUBJECT EXPORT LOGIC ---
@@ -971,77 +986,57 @@ function App() {
     });
   };
 
-  const handleExportSubjectCSV = () => {
+  const handleExportSubjectCSV = (safeName: string) => {
     const data = getSubjectExportData();
     let csvContent = "Subject,Day,Start Time,End Time,Educator Name,Role\n";
-
     data.forEach(row => {
       csvContent += `"${row.Subject}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}"\n`;
     });
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'subject_coverage.csv');
+    link.setAttribute('download', `${safeName}_subject_coverage.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleExportSubjectExcel = () => {
+  const handleExportSubjectExcel = (safeName: string) => {
     const data = getSubjectExportData();
-
-    // Remove the hidden _rawStart field before generating Excel
     const cleanData = data.map(({ _rawStart, ...rest }) => rest);
-
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Subject Coverage");
-    XLSX.writeFile(workbook, "subject_coverage.xlsx");
+    XLSX.writeFile(workbook, `${safeName}_subject_coverage.xlsx`);
   };
 
-  const handleExportSubjectPDF = () => {
+  const handleExportSubjectPDF = (safeName: string, rawName: string) => {
     const data = getSubjectExportData();
     const doc = new jsPDF();
-
     doc.setFontSize(16);
-    doc.text("Subject Coverage Report", 14, 15);
-
-    // Get unique subjects to group the tables
+    doc.text(`${rawName} - Subject Coverage`, 14, 15);
     const uniqueSubjects = Array.from(new Set(data.map(item => item.Subject)));
-
     let currentY = 25;
-
     uniqueSubjects.forEach(subject => {
       const subjectData = data.filter(item => item.Subject === subject);
       const tableData = subjectData.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role]);
-
       doc.setFontSize(12);
-      
-      // FIXED: Using standard string concatenation to avoid syntax errors
       doc.text("Subject: " + subject, 14, currentY);
-
       autoTable(doc, {
         head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role']],
         body: tableData,
         startY: currentY + 4,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [59, 130, 246] }, // A nice blue for subjects
+        headStyles: { fillColor: [59, 130, 246] },
         margin: { bottom: 20 }
       });
-
-      // Calculate where the next table should start
       currentY = (doc as any).lastAutoTable.finalY + 15;
-
-      // If we are getting too close to the bottom of the page, add a new page
       if (currentY > 270) {
         doc.addPage();
         currentY = 20;
       }
-
     });
-
-    doc.save("subject_coverage.pdf");
+    doc.save(`${safeName}_subject_coverage.pdf`);
   };
   
  // --- EDUCATOR SCHEDULE EXPORT LOGIC ("TIMESHEET" & "ITINERARY") ---
@@ -1094,136 +1089,104 @@ const getEducatorTimesheetData = () => {
   return timesheetData;
 };
 
-const handleExportEducatorCSV = () => {
-  const data = getEducatorTimesheetData();
-  let csvContent = "Educator Name,Role,Day,Start Time,End Time,Shift Duration (Hrs),Subjects Covered\n";
-
-  data.forEach(row => {
-    csvContent += `"${row['Educator Name']}","${row.Role}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Shift Duration (Hrs)']}","${row['Subjects Covered']}"\n`;
-  });
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.setAttribute('download', 'educator_timesheets.csv');
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-const handleExportEducatorExcel = () => {
-  const data = getEducatorTimesheetData();
-
-  // Explicit headers to guarantee Excel formatting
-  const worksheet = XLSX.utils.json_to_sheet(data, {
-    header: ["Educator Name", "Role", "Day", "Start Time", "End Time", "Shift Duration (Hrs)", "Subjects Covered"]
-  });
-  
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Educator Timesheets");
-  XLSX.writeFile(workbook, "educator_timesheets.xlsx");
-};
-
-const handleExportEducatorPDF = () => {
-  const doc = new jsPDF();
-  const printDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  
-  doc.setFontSize(18);
-  doc.text(`Educator Weekly Itineraries`, 14, 20);
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(`Generated: ${printDate}`, 14, 27);
-  doc.setTextColor(0);
-
-  const mergedShifts = getMergedWeeklySchedule(schedule);
-  const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-  // Order of categories in the PDF
-  const roles = ['SI Leader', 'Mentor', 'Tutor']; 
-  const existingRoles = Array.from(new Set(activeRoster.map(t => (t as any).role || 'Tutor')));
-  const allRoles = Array.from(new Set([...roles, ...existingRoles])); // Catch any custom roles
-
-  let currentY = 38;
-
-  allRoles.forEach(role => {
-    const tutorsInRole = activeRoster.filter(t => ((t as any).role || 'Tutor') === role);
-    if (tutorsInRole.length === 0) return;
-    
-    tutorsInRole.sort((a, b) => a.name.localeCompare(b.name));
-    
-    // Check if anyone in this role actually has shifts
-    const hasShiftsForRole = tutorsInRole.some(tutor => mergedShifts.some((s: any) => s.tutorId === tutor.id));
-    if (!hasShiftsForRole) return;
-
-    // --- Print Category Header ---
-    if (currentY > 260) { doc.addPage(); currentY = 20; }
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.setFillColor(240, 244, 248); // Light gray background for category
-    doc.rect(14, currentY - 5, 180, 8, 'F');
-    doc.text(`--- ${role.toUpperCase()}S ---`, 16, currentY);
-    currentY += 12;
-
-    tutorsInRole.forEach(tutor => {
-      const tutorShifts = mergedShifts.filter((s: any) => s.tutorId === tutor.id);
-      if (tutorShifts.length === 0) return;
-
-      // --- Print Educator Name ---
-      if (currentY > 260) { doc.addPage(); currentY = 20; }
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      // Removed total hours to match requested clean look
-      doc.text(`${tutor.name}`, 14, currentY);
-      currentY += 6;
-
-      // Group shifts by day for a cleaner format
-      const shiftsByDay: Record<string, any[]> = {};
-      tutorShifts.forEach((shift: any) => {
-        if (!shiftsByDay[shift.day]) shiftsByDay[shift.day] = [];
-        shiftsByDay[shift.day].push(shift);
-      });
-
-      // --- Print Shifts (Grouped by Day) ---
-      ALL_DAYS.forEach(day => {
-        const dayShifts = shiftsByDay[day];
-        if (dayShifts && dayShifts.length > 0) {
-          if (currentY > 270) { doc.addPage(); currentY = 20; }
-          
-          // Print Day Header (e.g., "Monday")
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.text(day, 18, currentY);
-          currentY += 5;
-
-          // Print Times for that day (e.g., "9:00 AM - 11:00 AM")
-          doc.setFont("helvetica", "normal");
-          dayShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
-          dayShifts.forEach(shift => {
-            if (currentY > 275) { doc.addPage(); currentY = 20; }
-            doc.text(`${format12Hour(shift.startTime)} - ${format12Hour(shift.endTime)}`, 18, currentY);
-            currentY += 5;
-          });
-          currentY += 2; // Small gap between days
-        }
-      });
-
-      // --- Print Subjects ---
-      if (currentY > 275) { doc.addPage(); currentY = 20; }
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "italic");
-      const subjectsText = `Subjects: ${tutor.subjects.join(', ')}`;
-      const splitSubjects = doc.splitTextToSize(subjectsText, 170);
-      doc.text(splitSubjects, 18, currentY);
-      
-      currentY += (splitSubjects.length * 5) + 8; // Extra padding below each person
+const handleExportEducatorCSV = (safeName: string) => {
+    const data = getEducatorTimesheetData();
+    let csvContent = "Educator Name,Role,Day,Start Time,End Time,Shift Duration (Hrs),Subjects Covered\n";
+    data.forEach(row => {
+      csvContent += `"${row['Educator Name']}","${row.Role}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Shift Duration (Hrs)']}","${row['Subjects Covered']}"\n`;
     });
-    
-    currentY += 4; 
-  });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${safeName}_educator_timesheets.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-  doc.save("educator_itineraries.pdf");
-};
-  
+  const handleExportEducatorExcel = (safeName: string) => {
+    const data = getEducatorTimesheetData();
+    const worksheet = XLSX.utils.json_to_sheet(data, {
+      header: ["Educator Name", "Role", "Day", "Start Time", "End Time", "Shift Duration (Hrs)", "Subjects Covered"]
+    });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Educator Timesheets");
+    XLSX.writeFile(workbook, `${safeName}_educator_timesheets.xlsx`);
+  };
+
+  const handleExportEducatorPDF = (safeName: string, rawName: string) => {
+    const doc = new jsPDF();
+    const printDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    doc.setFontSize(18);
+    doc.text(`${rawName} - Educator Itineraries`, 14, 20);
+    // ... rest of the existing PDF logic remains identical ...
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${printDate}`, 14, 27);
+    doc.setTextColor(0);
+    const mergedShifts = getMergedWeeklySchedule(schedule);
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const roles = ['SI Leader', 'Mentor', 'Tutor']; 
+    const existingRoles = Array.from(new Set(activeRoster.map(t => (t as any).role || 'Tutor')));
+    const allRoles = Array.from(new Set([...roles, ...existingRoles])); 
+    let currentY = 38;
+    allRoles.forEach(role => {
+      const tutorsInRole = activeRoster.filter(t => ((t as any).role || 'Tutor') === role);
+      if (tutorsInRole.length === 0) return;
+      tutorsInRole.sort((a, b) => a.name.localeCompare(b.name));
+      const hasShiftsForRole = tutorsInRole.some(tutor => mergedShifts.some((s: any) => s.tutorId === tutor.id));
+      if (!hasShiftsForRole) return;
+      if (currentY > 260) { doc.addPage(); currentY = 20; }
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(240, 244, 248); 
+      doc.rect(14, currentY - 5, 180, 8, 'F');
+      doc.text(`--- ${role.toUpperCase()}S ---`, 16, currentY);
+      currentY += 12;
+      tutorsInRole.forEach(tutor => {
+        const tutorShifts = mergedShifts.filter((s: any) => s.tutorId === tutor.id);
+        if (tutorShifts.length === 0) return;
+        if (currentY > 260) { doc.addPage(); currentY = 20; }
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${tutor.name}`, 14, currentY);
+        currentY += 6;
+        const shiftsByDay: Record<string, any[]> = {};
+        tutorShifts.forEach((shift: any) => {
+          if (!shiftsByDay[shift.day]) shiftsByDay[shift.day] = [];
+          shiftsByDay[shift.day].push(shift);
+        });
+        ALL_DAYS.forEach(day => {
+          const dayShifts = shiftsByDay[day];
+          if (dayShifts && dayShifts.length > 0) {
+            if (currentY > 270) { doc.addPage(); currentY = 20; }
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text(day, 18, currentY);
+            currentY += 5;
+            doc.setFont("helvetica", "normal");
+            dayShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            dayShifts.forEach(shift => {
+              if (currentY > 275) { doc.addPage(); currentY = 20; }
+              doc.text(`${format12Hour(shift.startTime)} - ${format12Hour(shift.endTime)}`, 18, currentY);
+              currentY += 5;
+            });
+            currentY += 2; 
+          }
+        });
+        if (currentY > 275) { doc.addPage(); currentY = 20; }
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        const subjectsText = `Subjects: ${tutor.subjects.join(', ')}`;
+        const splitSubjects = doc.splitTextToSize(subjectsText, 170);
+        doc.text(splitSubjects, 18, currentY);
+        currentY += (splitSubjects.length * 5) + 8; 
+      });
+      currentY += 4; 
+    });
+    doc.save(`${safeName}_educator_itineraries.pdf`);
+  };
+
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
     
@@ -1369,95 +1332,100 @@ const handleExportEducatorPDF = () => {
                         minWidth: '200px' 
                       }}>
                         
+                        
+  
                         {/* SECTION: MASTER SCHEDULE */}
-                          <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
-                            Master Schedule (Chronological)
-                          </div>
-                          <button 
-                            onClick={() => { handleExportCSV(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📄 CSV File
-                          </button>
-                          <button 
-                            onClick={() => { handleExportExcel(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📊 Excel (.xlsx)
-                          </button>
-                          <button 
-                            onClick={() => { handleExportPDF(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📕 PDF Document
-                          </button>
+                        <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
+                          Master Schedule
+                        </div>
+                        <button 
+                          onClick={() => executeExport(handleExportCSV)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📄 CSV File
+                        </button>
+                        <button 
+                          onClick={() => executeExport(handleExportExcel)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📊 Excel (.xlsx)
+                        </button>
+                        <button 
+                          onClick={() => executeExport(handleExportPDF)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📕 PDF Document
+                        </button>
 
-                          <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
-                          
-                          {/* SECTION: EDUCATOR BREAKDOWNS */}
-                          <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
-                            Educator Breakdowns
-                          </div>
-                          <button 
-                            onClick={() => { handleExportEducatorCSV(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📄 CSV File
-                          </button>
-                          <button 
-                            onClick={() => { handleExportEducatorExcel(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📊 Excel (.xlsx)
-                          </button>
-                          <button 
-                            onClick={() => { handleExportEducatorPDF(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📕 PDF Document
-                          </button>
-                          {/* SECTION: SUBJECT COVERAGE */}
-                          <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
-                            Subject Coverage
-                          </div>
-                          <button 
-                            onClick={() => { handleExportSubjectCSV(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📄 CSV File
-                          </button>
-                          <button 
-                            onClick={() => { handleExportSubjectExcel(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📊 Excel (.xlsx)
-                          </button>
-                          <button 
-                            onClick={() => { handleExportSubjectPDF(); setShowExportModal(false); }} 
-                            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            📕 PDF Document
-                          </button>
+                        <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
+                        
+                        {/* SECTION: EDUCATOR BREAKDOWNS */}
+                        <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
+                          Educator Breakdowns
+                        </div>
+                        <button 
+                          onClick={() => executeExport(handleExportEducatorCSV)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📄 CSV File
+                        </button>
+                        <button 
+                          onClick={() => executeExport(handleExportEducatorExcel)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📊 Excel (.xlsx)
+                        </button>
+                        <button 
+                          onClick={() => executeExport(handleExportEducatorPDF)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📕 PDF Document
+                        </button>
+  
+                        <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
+                        
+                        {/* SECTION: SUBJECT COVERAGE */}
+                        <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
+                          Subject Coverage
+                        </div>
+                        <button 
+                          onClick={() => executeExport(handleExportSubjectCSV)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📄 CSV File
+                        </button>
+                        <button 
+                          onClick={() => executeExport(handleExportSubjectExcel)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📊 Excel (.xlsx)
+                        </button>
+                        <button 
+                          onClick={() => executeExport(handleExportSubjectPDF)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontWeight: '500', color: '#334155' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          📕 PDF Document
+                        </button>
 
-                          <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
+                      <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
 
                       </div>
                     )}

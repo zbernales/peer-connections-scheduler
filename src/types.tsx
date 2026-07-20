@@ -36,4 +36,5 @@ export interface ScheduleConfig {
   autoScheduleWeekendHours?: boolean;
   maxTutorsPerWeekendShift?: number;
   allowedRoles?: string[];
+  prioritySubjects?: string[];
 }

@@ -1231,6 +1231,7 @@ const handleExportEducatorCSV = (safeName: string) => {
                 config={scheduleConfig} 
                 onConfigChange={setScheduleConfig}
                 onGenerate={handleGenerateSchedule} 
+                globalRoster={globalRoster}
               />
             </ProtectedRoute>
           } />

@@ -22,7 +22,6 @@ export function format12Hour(time24: string): string {
   return `${hr12}${minStr}${ampm}`;
 }
 
-// --- CONSTRAINT HELPERS ---
 function isAvailable(tutor: Tutor, day: DayOfWeek, timeSlot: number): boolean {
   return tutor.availability.some(slot => {
     if (slot.day !== day) return false;
@@ -40,7 +39,6 @@ function isAlreadyWorking(tutorId: string, day: DayOfWeek, timeSlot: number, cur
   });
 }
 
-// --- THE SCHEDULER ---
 export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift[] {
   const schedule: Shift[] = [];
   const hoursAssigned: Record<string, number> = {};
@@ -147,26 +145,47 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
       while (eligibleTutors.length > 0 && tutorsScheduledThisSlot < currentCap) {
         
         eligibleTutors.sort((a, b) => {
+          // 1. Keep working if already working (minimize gaps)
           const aIsWorking = consecutiveSlotsToday[a.id] > 0;
           const bIsWorking = consecutiveSlotsToday[b.id] > 0;
           if (aIsWorking && !bIsWorking) return -1;
           if (!aIsWorking && bIsWorking) return 1;
 
+          // 2. Minimum Hours Target
           const aNeedsMin = hoursAssigned[a.id] < a.minHours;
           const bNeedsMin = hoursAssigned[b.id] < b.minHours;
           if (aNeedsMin && !bNeedsMin) return -1;
           if (!aNeedsMin && bNeedsMin) return 1;
 
+          // 3. Availability Scarcity
           if (aNeedsMin && bNeedsMin) {
             const aAvailable = tutorTotalAvailability[a.id];
             const bAvailable = tutorTotalAvailability[b.id];
             if (aAvailable !== bAvailable) return aAvailable - bAvailable;
           }
 
+          // ---> NEW: 4. PRIORITY SUBJECTS <---
+          // Check how many priority subjects this tutor can teach that ARE NOT YET COVERED in this time slot
+          if (config.prioritySubjects && config.prioritySubjects.length > 0) {
+            const aPriorityCount = a.subjects.filter(sub => 
+              config.prioritySubjects!.includes(sub) && !coveredSubjectsThisSlot.has(sub)
+            ).length;
+            
+            const bPriorityCount = b.subjects.filter(sub => 
+              config.prioritySubjects!.includes(sub) && !coveredSubjectsThisSlot.has(sub)
+            ).length;
+
+            if (aPriorityCount !== bPriorityCount) {
+              return bPriorityCount - aPriorityCount; // Higher priority count wins
+            }
+          }
+
+          // 5. Broad Subject Coverage (If neither has a priority subject, who brings the most unique normal subjects?)
           const aNewSubjects = a.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
           const bNewSubjects = b.subjects.filter(sub => !coveredSubjectsThisSlot.has(sub)).length;
           if (aNewSubjects !== bNewSubjects) return bNewSubjects - aNewSubjects;
 
+          // 6. Percent Full (Load Balancing)
           const aActualMax = Math.min(a.maxHours, globalMaxWeekly);
           const bActualMax = Math.min(b.maxHours, globalMaxWeekly);
           const aPercentFull = hoursAssigned[a.id] / aActualMax;

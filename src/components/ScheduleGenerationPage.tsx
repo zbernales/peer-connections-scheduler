@@ -267,11 +267,10 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#475569', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-               High Demand Subjects
-               <span style={{ fontSize: '0.75rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.1rem 0.5rem', borderRadius: '12px', fontWeight: 'bold' }}>Optional</span>
+               High Demand Subjects (Optional)
             </h4>
             <p style={{ fontSize: '0.9rem', color: '#64748b', marginTop: 0, marginBottom: '1rem', maxWidth: '500px' }}>
-              The algorithm will actively prioritize scheduling educators who can support these specific subjects to ensure they have maximum coverage throughout the week.
+              The algorithm will prioritize scheduling educators who can support these specific subjects to ensure they have maximum coverage throughout the week.
             </p>
           </div>
 
@@ -297,7 +296,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
               </div>
             <input
               type="text"
-              placeholder="Search subjects to prioritize (e.g., CS 146)..."
+              placeholder="Search subjects to prioritize..."
               value={subjectSearchTerm}
               onChange={(e) => {
                 setSubjectSearchTerm(e.target.value);

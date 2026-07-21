@@ -26,6 +26,9 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
   const subjectWrapperRef = useRef<HTMLDivElement>(null);
 
+  // --- NEW: Modal State ---
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+
   // 1. Generate unique list of all subjects currently supported by the active roster
   const allAvailableSubjects = useMemo(() => {
     const subjects = new Set<string>();
@@ -67,11 +70,15 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
     });
   };
 
-  const clearAllPrioritySubjects = () => {
+  // --- NEW: Modal Logic ---
+  const handleClearClick = () => {
     if (prioritySubjects.length === 0) return;
-    if (window.confirm("Are you sure you want to clear all high-priority subjects?")) {
-      onConfigChange({ ...config, prioritySubjects: [] });
-    }
+    setIsClearModalOpen(true);
+  };
+
+  const confirmClear = () => {
+    onConfigChange({ ...config, prioritySubjects: [] });
+    setIsClearModalOpen(false);
   };
 
   // 5. Handle Enter Key for quick adding
@@ -262,21 +269,22 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
         </div>
       </div>
 
-      {/* --- NEW: High Demand Subject Prioritization --- */}
+      {/* --- High Demand Subject Prioritization --- */}
       <div style={{ marginBottom: '2rem', padding: '1.25rem', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: '#475569', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-               High Demand Subjects (Optional)
+               High Demand Subjects
+               <span style={{ fontSize: '0.75rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.1rem 0.5rem', borderRadius: '12px', fontWeight: 'bold' }}>Optional</span>
             </h4>
             <p style={{ fontSize: '0.9rem', color: '#64748b', marginTop: 0, marginBottom: '1rem', maxWidth: '500px' }}>
-              The algorithm will prioritize scheduling educators who can support these specific subjects to ensure they have maximum coverage throughout the week.
+              The algorithm will actively prioritize scheduling educators who can support these specific subjects to ensure they have maximum coverage throughout the week.
             </p>
           </div>
 
           {prioritySubjects.length > 0 && (
             <button
-              onClick={clearAllPrioritySubjects}
+              onClick={handleClearClick}
               style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 'bold', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -296,7 +304,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
               </div>
             <input
               type="text"
-              placeholder="Search subjects to prioritize..."
+              placeholder="Search subjects to prioritize (e.g., CS 146)..."
               value={subjectSearchTerm}
               onChange={(e) => {
                 setSubjectSearchTerm(e.target.value);
@@ -377,6 +385,33 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
           )}
         </div>
       </div>
+
+      {/* --- NEW: Clear All Modal --- */}
+      {isClearModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.4rem' }}>Clear Priority Subjects</h3>
+            <p style={{ color: '#475569', marginBottom: '2rem', lineHeight: '1.5' }}>
+              Are you sure you want to clear all high-priority subjects? The algorithm will return to balancing all subjects equally.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setIsClearModalOpen(false)} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmClear} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Yes, Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

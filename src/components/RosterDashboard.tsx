@@ -9,6 +9,9 @@ import jsPDF from 'jspdf';
 interface RosterDashboardProps {
   roster: Tutor[];
   onSelectTutor: (tutor: Tutor) => void;
+  // --- NEW: Toast props ---
+  showToast: (message: string) => void;
+  showErrorToast: (message: string) => void;
 }
 
 // Helper to color-code roles
@@ -18,41 +21,68 @@ const ROLE_COLORS: Record<string, { bg: string, text: string }> = {
   'Mentor': { bg: '#dcfce7', text: '#15803d' },      // Light Green
 };
 
-export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps) {
+export function RosterDashboard({ roster, onSelectTutor, showToast, showErrorToast }: RosterDashboardProps) {
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  // --- NEW: Modal States ---
+  const [tutorToDelete, setTutorToDelete] = useState<{id: string, name: string} | null>(null);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetInput, setResetInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
 
-  const handleDelete = async (tutorId: string, tutorName: string, e: React.MouseEvent) => {
+  // --- NEW: Delete Logic ---
+  const handleDeleteClick = (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to permanently delete ${tutorName}?`)) {
-      try {
-        await deleteDoc(doc(db, 'tutors', tutorId));
-      } catch (error) {
-        console.error("Error deleting tutor:", error);
-        alert("Failed to delete tutor.");
-      }
+    setTutorToDelete({ id: tutorId, name: tutorName }); // Opens the delete modal
+  };
+
+  const confirmDelete = async () => {
+    if (!tutorToDelete) return;
+    setIsProcessing(true);
+    try {
+      await deleteDoc(doc(db, 'tutors', tutorToDelete.id));
+      showToast(`${tutorToDelete.name} has been permanently deleted.`);
+      setTutorToDelete(null);
+    } catch (error) {
+      console.error("Error deleting tutor:", error);
+      showErrorToast("Failed to delete tutor. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleResetRoster = async () => {
-    const confirmMessage = "Are you sure you want to clear the entire roster? \n\nThis will permanently delete ALL current tutors from the active database. \n\n(Your previously Saved Schedules will remain intact)";
+  // --- NEW: Reset Logic ---
+  const handleResetClick = () => {
     if (roster.length === 0) {
-      alert("The roster is already empty.");
+      showErrorToast("The roster is already empty.");
       return;
     }
-    if (window.confirm(confirmMessage)) {
-      try {
-        const deletePromises = roster.map(tutor => deleteDoc(doc(db, 'tutors', tutor.id)));
-        await Promise.all(deletePromises);
-        alert("Roster successfully reset.");
-      } catch (error) {
-        console.error("Error resetting roster:", error);
-        alert("Failed to reset roster.");
-      }
+    setResetInput('');
+    setIsResetModalOpen(true); // Opens the reset modal
+  };
+
+  const confirmReset = async () => {
+    if (resetInput !== 'RESET') {
+      showErrorToast("You must type RESET exactly to confirm.");
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      const deletePromises = roster.map(tutor => deleteDoc(doc(db, 'tutors', tutor.id)));
+      await Promise.all(deletePromises);
+      showToast("Roster successfully reset.");
+      setIsResetModalOpen(false);
+    } catch (error) {
+      console.error("Error resetting roster:", error);
+      showErrorToast("Failed to reset roster. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -60,9 +90,10 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
     try {
       await updateDoc(doc(db, 'tutors', updatedTutorData.id), updatedTutorData);
       setEditingTutor(null);
+      showToast(`${updatedTutorData.name}'s profile has been updated.`);
     } catch (error) {
       console.error("Error updating tutor:", error);
-      alert("Failed to update tutor.");
+      showErrorToast("Failed to update profile. Please try again.");
     }
   };
 
@@ -116,7 +147,9 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
 
   const handleExportExcel = () => {
     const data = getRosterExportData();
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    const worksheet = XLSX.utils.json_to_sheet(data, { 
+        header: ["Name", "Role", "Min Hours", "Max Hours", "Night Availability", "Weekend Availability", "Subject Count", "Subjects"] 
+    });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Educator Roster");
     XLSX.writeFile(workbook, "educator_roster.xlsx");
@@ -175,15 +208,15 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
         <h2 style={{ margin: 0, fontSize: '1.8rem' }}>Peer Educator Roster ({filteredRoster.length})</h2>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           
-          {/* --- NEW EXPORT MENU --- */}
+          {/* --- MODERN EXPORT MENU --- */}
           <div style={{ position: 'relative' }}>
             <button 
               onClick={() => setShowExportModal(!showExportModal)} 
-              style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              style={{ padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.1rem', height: '1.1rem' }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg> 
+              </svg>
               Export Roster ▾
             </button>
 
@@ -217,15 +250,13 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
             )}
           </div>
 
-          <button onClick={handleResetRoster} style={{ padding: '0.5rem 1.5rem', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #f87171', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
+          <button onClick={handleResetClick} style={{ padding: '0.5rem 1.5rem', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #f87171', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Reset Roster</button>
         </div>
       </div>
 
       {/* Filters Container */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'center' }}>
-        {/* Modern Search Input Wrapper */}
         <div style={{ position: 'relative', flex: 1 }}>
-          {/* SVG Search Icon */}
           <div style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -282,7 +313,7 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button onClick={(e) => { e.stopPropagation(); setEditingTutor(tutor); }} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#475569', fontWeight: 'bold' }}>Edit Profile</button>
-                <button onClick={(e) => handleDelete(tutor.id, tutor.name, e)} style={{ padding: '0.5rem 1rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>Remove</button>
+                <button onClick={(e) => handleDeleteClick(tutor.id, tutor.name, e)} style={{ padding: '0.5rem 1rem', backgroundColor: '#fee2e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold' }}>Remove</button>
               </div>
             </div>
           );
@@ -296,14 +327,97 @@ export function RosterDashboard({ roster, onSelectTutor }: RosterDashboardProps)
         )}
       </div>
       
+      {/* ------------------------------------------------------------- */}
+      {/* ------------------------- MODALS ---------------------------- */}
+      {/* ------------------------------------------------------------- */}
+
+      {/* 1. Edit Tutor Modal */}
       {editingTutor && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Edit {editingTutor.name}'s Profile</h2>
-            <TutorForm initialData={editingTutor} onSubmit={handleSaveEdit} onCancel={() => setEditingTutor(null)} />
+            <TutorForm initialData={editingTutor} onSubmit={handleSaveEdit} onCancel={() => setEditingTutor(null)} showToast={showToast} showErrorToast={showErrorToast} />
           </div>
         </div>
       )}
+
+      {/* 2. Delete Confirmation Modal */}
+      {tutorToDelete && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.4rem' }}>Remove Peer Educator</h3>
+            <p style={{ color: '#475569', marginBottom: '2rem', lineHeight: '1.5' }}>
+              Are you sure you want to permanently delete <strong>{tutorToDelete.name}</strong> from the database? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setTutorToDelete(null)} 
+                disabled={isProcessing}
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                disabled={isProcessing}
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+              >
+                {isProcessing ? 'Removing...' : 'Yes, Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Reset Roster Modal */}
+      {isResetModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '8px', maxWidth: '500px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#ef4444', marginBottom: '1rem' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <h3 style={{ margin: 0, fontSize: '1.5rem' }}>Reset Entire Roster</h3>
+            </div>
+            
+            <p style={{ color: '#475569', marginBottom: '1rem', lineHeight: '1.5' }}>
+              This will permanently delete <strong>ALL {roster.length} peer educators</strong> from the active database. Your previously Saved Schedules will remain intact.
+            </p>
+            <p style={{ color: '#0f172a', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+              To confirm, type "RESET" in the box below:
+            </p>
+            
+            <input 
+              type="text" 
+              value={resetInput}
+              onChange={(e) => setResetInput(e.target.value)}
+              placeholder="RESET"
+              disabled={isProcessing}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '1.1rem', marginBottom: '2rem', boxSizing: 'border-box' }}
+            />
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setIsResetModalOpen(false)} 
+                disabled={isProcessing}
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmReset} 
+                disabled={isProcessing || resetInput !== 'RESET'}
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: resetInput === 'RESET' ? '#ef4444' : '#fca5a5', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: (isProcessing || resetInput !== 'RESET') ? 'not-allowed' : 'pointer', transition: 'background-color 0.2s' }}
+              >
+                {isProcessing ? 'Clearing Database...' : 'Permanently Reset Roster'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

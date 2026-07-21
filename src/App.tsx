@@ -1265,15 +1265,16 @@ const handleExportEducatorCSV = (safeName: string) => {
             isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />
           } />
 
-          <Route path="/admin" element={
+         <Route path="/admin" element={
             <ProtectedRoute isAdmin={isAdmin}>
               <RosterDashboard 
                 roster={globalRoster} 
                 onSelectTutor={setSelectedTutorModal}
+                showToast={showToast}
+                showErrorToast={showErrorToast}
               />
             </ProtectedRoute>
           } />
-
           <Route path="/generate" element={
             <ProtectedRoute isAdmin={isAdmin}>
               <ScheduleGenerationPage 

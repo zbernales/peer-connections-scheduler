@@ -1291,7 +1291,10 @@ const handleExportEducatorCSV = (safeName: string) => {
 
           <Route path="/saved" element={
             <ProtectedRoute isAdmin={isAdmin}>
-              <SavedSchedules onLoadSchedule={(id, name, loadedShifts, loadedRoster) => {
+              <SavedSchedules 
+                showToast={showToast}
+                showErrorToast={showErrorToast}
+                onLoadSchedule={(id, name, loadedShifts, loadedRoster) => { 
                 setSchedule(loadedShifts);
                 setActiveRoster(loadedRoster && loadedRoster.length > 0 ? loadedRoster : globalRoster);
                 setSelectedTutorModal(null);

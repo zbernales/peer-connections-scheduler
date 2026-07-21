@@ -113,7 +113,7 @@ function getMergedWeeklySchedule(weeklyShifts: any[]) {
 
 function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: React.ReactNode }) {
   if (!isAdmin) {
-    return <Navigate to="/submit" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }
@@ -547,7 +547,7 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
         Submission Form
       </Link>
       
-      {isAdmin ? (
+      {isAdmin && (
         <>
           <Link onClick={handleNavClick} to="/generate" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/generate' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
             Schedule Generator
@@ -562,13 +562,9 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
             Saved Schedules
           </Link>
           <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-            Lock App
+            Log Out
           </button>
         </>
-      ) : (
-        <Link to="/login" style={{ textDecoration: 'none', padding: '0.5rem 1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-          Admin Login
-        </Link>
       )}
     </nav>
   );
@@ -580,11 +576,14 @@ function App() {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const showNavbar = location.pathname !== "/login";
 
   const handleLogin = (pin: string) => {
     if (pin === ADMIN_PIN) {
-      localStorage.setItem('peerConnectionsAdmin', 'true');
       setIsAdmin(true);
+      localStorage.setItem('peerConnectionsAdmin', 'true');
       navigate('/admin'); 
     } else {
       alert('Incorrect PIN.');
@@ -592,9 +591,9 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('peerConnectionsAdmin');
     setIsAdmin(false);
-    navigate('/submit'); 
+    localStorage.removeItem('peerConnectionsAdmin');
+    navigate('/login'); 
   };
 
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
@@ -1188,13 +1187,19 @@ const handleExportEducatorCSV = (safeName: string) => {
   };
 
   return (
-    <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
-    
-      <NavBar hasUnsavedChanges={hasUnsavedChanges} onDiscardChanges={handleDiscardUnsavedChanges} isAdmin={isAdmin} onLogout={handleLogout} />
+  <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
 
-      <div style={{ padding: '0 2rem 2rem 2rem' }}>
-        <Routes>
-          
+    {showNavbar && (
+      <NavBar
+        hasUnsavedChanges={hasUnsavedChanges}
+        onDiscardChanges={handleDiscardUnsavedChanges}
+        isAdmin={isAdmin}
+        onLogout={handleLogout}
+      />
+    )}
+
+    <div style={{ padding: '0 2rem 2rem 2rem' }}>
+      <Routes>
           <Route path="/submit" element={
             <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
               <TutorForm onSubmit={(newTutor) => {
@@ -1211,6 +1216,7 @@ const handleExportEducatorCSV = (safeName: string) => {
           } />
 
           <Route path="*" element={<Navigate to="/submit" replace />} />
+          <Route path="/" element={<Navigate to="/submit" replace />} />
 
           <Route path="/login" element={
             isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />

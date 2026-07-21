@@ -1254,7 +1254,10 @@ const handleExportEducatorCSV = (safeName: string) => {
           {/* --- NEW: Course Catalog Route --- */}
           <Route path="/courses" element={
             <ProtectedRoute isAdmin={isAdmin}>
-              <AdminCoursesPage />
+              <AdminCoursesPage 
+                showToast={showToast}
+                showErrorToast={showErrorToast}
+              />
             </ProtectedRoute>
           } />
 

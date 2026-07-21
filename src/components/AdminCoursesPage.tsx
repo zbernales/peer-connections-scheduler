@@ -1,151 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { getAllCourses, saveCourse, removeCourse, type Course } from '../services/courseService';
 
-const AVAILABLE_COURSES = [
-  // Aerospace Engineering
-  'AE 20', 'AE 30', 'AE 112', 'AE 114', 'AE 138', 'AE 160', 'AE 162', 'AE 164', 'AE 165',
-  
-  // American Studies & Anthropology
-  'AMS 139', 'ANTH 11', 'ANTH 12', 'ANTH 100W', 'ANTH 115', 'ANTH 140', 'ANTH 146', 'ANTH 160', 'ANTH 168', 'ANTH 176', 'ANTH 193',
-  
-  // Biological Sciences & Microbiology
-  'BIOL 10', 'BIOL 21', 'BIOL 30', 'BIOL 31', 'BIOL 54', 'BIOL 65', 'BIOL 66', 'BIOL 115', 'BIOL 124', 'BIOL 155', 'BIOL 167', 'MICR 20', 'MICR 101',
-  
-  // Business (BUS1 - BUS5)
-  'BUS1 20', 'BUS1 21', 'BUS1 120A', 'BUS1 120B', 'BUS1 121A', 'BUS1 121B', 'BUS1 122A', 'BUS1 123A', 'BUS1 123C', 'BUS1 124', 'BUS1 127A', 'BUS1 129A', 'BUS1 170', 'BUS1 172A', 'BUS1 173A', 'BUS1 173B',
-  'BUS2 90', 'BUS2 130', 'BUS2 190', 'BUS2 194A', 'BUS2 194B', 'BUS2 195A', 'BUS2 195B',
-  'BUS3 10', 'BUS3 12', 'BUS3 80', 'BUS3 150', 'BUS3 160', 'BUS3 161A', 'BUS3 161B', 'BUS3 186',
-  'BUS4 91L', 'BUS4 92', 'BUS4 188',
-  'BUS5 140', 'BUS5 187',
-  
-  // Chemical & Chemistry
-  'CHE 110B', 'CHE 115', 'CHE 162', 'CHE 190',
-  'CHEM 1A', 'CHEM 1B', 'CHEM 8', 'CHEM 10', 'CHEM 30A', 'CHEM 30B', 'CHEM 55', 'CHEM 112A', 'CHEM 112B', 'CHEM 135',
-  
-  // Child Dev & Civil Engineering
-  'CHAD 60', 'CHAD 70', 'CE 8', 'CE 95', 'CE 112',
-  
-  // Communication & Economics
-  'COMM 10', 'COMM 20', 'COMM 20EL', 'COMM 20N', 'ECON 1A', 'ECON 1B', 'ECON 101', 'ECON 102', 'ECON 132',
-  
-  // Computer Engineering
-  'CMPE 30', 'CMPE 50', 'CMPE 102', 'CMPE 110', 'CMPE 124', 'CMPE 125', 'CMPE 126', 'CMPE 127', 'CMPE 130', 'CMPE 131', 'CMPE 132', 'CMPE 140', 'CMPE 142', 'CMPE 148', 'CMPE 152', 'CMPE 165', 'CMPE 172', 'CMPE 187',
-  
-  // Computer Science & Data Science
-  'CS 22A', 'CS 46A', 'CS 46B', 'CS 47', 'CS 49C', 'CS 49J', 'CS 100W', 'CS 131', 'CS 146', 'CS 147', 'CS 149', 'CS 151', 'CS 152', 'CS 154', 'CS 157A', 'CS 157C', 'CS 160', 'CS 166', 'CS 171',
-  'ISDA 20B', 'ISDA 140',
-  
-  // Electrical & General Engineering
-  'EE 97', 'EE 98', 'ENGR 10', 'ENGR 100W', 'ENGR 195A',
-  
-  // Engineering Technology
-  'TECH 30', 'TECH 60', 'TECH 65', 'TECH 66', 'TECH 67', 'TECH 145', 'TECH 165', 'TECH 170', 'TECH 171', 'TECH 173', 'TECH 179', 'TECH 198',
-  
-  // English & Humanities
-  'ENGL 1A', 'ENGL 1B', 'ENGL 2', 'Undergraduate Writing', 'HUM 10', 'HIST 15', 'PHIL 12', 'PHIL 186',
-  
-  // Design & Kinesiology
-  'DSGD 83', 'DSID 126', 'KIN 158',
-  
-  // Geology, Meteorology & Materials Eng
-  'GEOL 1', 'GEOL 8', 'GEOL 9', 'METR 112', 'MATE 25',
-  
-  // Industrial Systems & Mechanical Engineering
-  'ISE 130', 'ISE 164',
-  'ME 20', 'ME 30', 'ME 41', 'ME 101', 'ME 111', 'ME 113', 'ME 114', 'ME 115', 'ME 130', 'ME 147', 'ME 154', 'ME 165', 'ME 190', 'ME 195A',
-  
-  // Math & Statistics
-  'MATH 15', 'MATH 18A', 'MATH 18B', 'MATH 19', 'MATH 30', 'MATH 31', 'MATH 32', 'MATH 33A', 'MATH 33LA', 'MATH 34', 'MATH 39', 'MATH 42', 'MATH 70', 'MATH 71', 'MATH 142', 'MATH 161A', 'MATH 177', 
-  'STAT 95', 'Statistics', 'UNVS 15',
-  
-  // Nutrition & Public Health
-  'NUFS 1A', 'NUFS 8', 'NUFS 9', 'NUFS 10', 'NUFS 16', 'NUFS 21', 'NUFS 144',
-  'PH 1', 'PH 15', 'PH 67', 'PH 99', 'PH 100W', 'PH 161', 'PH 165A', 'PH 167',
-  
-  // Physics
-  'PHYS 1', 'PHYS 2A', 'PHYS 2B', 'PHYS 49', 'PHYS 50', 'PHYS 51', 'PHYS 52',
-  
-  // Political Science, Psychology, Sociology
-  'POLS 3', 'POLS 15',
-  'PSYC 1', 'PSYC 18', 'PSYC 30', 'PSYC 100W', 'PSYC 114', 'PSYC 117', 'PSYC 118', 'PSYC 135', 'PSYC 139', 'PSYC 153', 'PSYC 155', 'PSYC 173', 'PSYC 191',
-  'SOCI 1', 'SOCI 15', 'SOCI 80', 'SOCI 100W', 'SOCI 101', 'SOCI 104', 'SOCI 116', 'SOCI 145', 'SOCI 165',
-  
-  // World Languages & Linguistics
-  'LING 21', 'LING 26',
-  'CHIN 1A', 'CHIN 1B', 'FREN 1A', 'FREN 1B', 'JPN 1A', 'JPN 1B', 'JPN 25A', 'JPN 25B', 'JPN 101C', 'VIET 1A', 'VIET 1B'
-].sort();
+interface AdminCoursesPageProps {
+  showToast: (message: string) => void;
+  showErrorToast: (message: string) => void;
+}
 
-const DEPARTMENT_NAMES: Record<string, string> = {
-  AE: 'Aerospace Engineering',
-  AMS: 'American Studies',
-  ANTH: 'Anthropology',
-  BIOL: 'Biological Sciences',
-  MICR: 'Microbiology',
-  BUS1: 'Business',
-  BUS2: 'Business',
-  BUS3: 'Business',
-  BUS4: 'Business',
-  BUS5: 'Business',
-  CHE: 'Chemical Engineering',
-  CHEM: 'Chemistry',
-  CHAD: 'Child Development',
-  CE: 'Civil Engineering',
-  COMM: 'Communication',
-  ECON: 'Economics',
-  CMPE: 'Computer Engineering',
-  CS: 'Computer Science',
-  ISDA: 'Data Science',
-  EE: 'Electrical Engineering',
-  ENGR: 'General Engineering',
-  TECH: 'Engineering Technology',
-  ENGL: 'English',
-  HUM: 'Humanities',
-  HIST: 'History',
-  PHIL: 'Philosophy',
-  DSGD: 'Design',
-  DSID: 'Design',
-  KIN: 'Kinesiology',
-  GEOL: 'Geology',
-  METR: 'Meteorology',
-  MATE: 'Materials Engineering',
-  ISE: 'Industrial & Systems Engineering',
-  ME: 'Mechanical Engineering',
-  MATH: 'Mathematics',
-  STAT: 'Statistics',
-  UNVS: 'University Studies',
-  NUFS: 'Nutrition & Food Science',
-  PH: 'Public Health',
-  PHYS: 'Physics',
-  POLS: 'Political Science',
-  PSYC: 'Psychology',
-  SOCI: 'Sociology',
-  LING: 'Linguistics',
-  CHIN: 'Chinese',
-  FREN: 'French',
-  JPN: 'Japanese',
-  VIET: 'Vietnamese',
-  Undergraduate: 'Undergraduate Writing' 
-};
-
-export const AdminCoursesPage: React.FC = () => {
+export function AdminCoursesPage({ showToast, showErrorToast }: AdminCoursesPageProps) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseCode, setCourseCode] = useState('');
   const [courseName, setCourseName] = useState('');
   const [department, setDepartment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null); // NEW: Error tracking
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // --- NEW: Search, Filter, and Edit State ---
+  // Search, Filter, and Edit State
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Modal State
+  const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
 
   // Load courses on component mount
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      setFetchError(null); // Reset error on new fetch
+      setFetchError(null); 
       const data = await getAllCourses();
       setCourses(data);
     } catch (error: any) {
@@ -174,16 +56,18 @@ export const AdminCoursesPage: React.FC = () => {
       
       await saveCourse(courseData);
       
-      // Reset form options
+      const isUpdating = editingId !== null;
+      
       setCourseCode('');
       setCourseName('');
       setDepartment('');
       setEditingId(null);
       
-      // Refresh list
       await fetchCourses();
+      showToast(isUpdating ? `${courseData.id} successfully updated.` : `${courseData.id} successfully added.`);
     } catch (error) {
       console.error("Error saving course:", error);
+      showErrorToast("Failed to save course. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -194,7 +78,6 @@ export const AdminCoursesPage: React.FC = () => {
     setCourseName(course.name);
     setDepartment(course.department);
     setEditingId(course.id);
-    // Scroll to top smoothly so admin easily sees the form changed
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -205,49 +88,26 @@ export const AdminCoursesPage: React.FC = () => {
     setEditingId(null);
   };
 
-  const handleDeleteCourse = async (id: string) => {
-    if (!window.confirm(`Are you sure you want to remove ${id}?`)) return;
-    
-    try {
-      await removeCourse(id);
-      setCourses(prev => prev.filter(course => course.id !== id));
-    } catch (error) {
-      console.error("Error deleting course:", error);
-    }
+  const handleDeleteClick = (id: string) => {
+    setCourseToDelete(id); 
   };
 
-  // --- NEW: Seeding Function ---
-  const handleSeedDatabase = async () => {
-    if (!window.confirm("Are you sure you want to seed the database? This will upload ~150 courses.")) return;
+  const confirmDelete = async () => {
+    if (!courseToDelete) return;
     
     try {
-      setSubmitting(true);
-      
-      // Process sequentially instead of 150 at once to prevent Firebase from hanging
-      for (const courseStr of AVAILABLE_COURSES) {
-        const prefix = courseStr.split(' ')[0]; // Extract the prefix (e.g., "CS" from "CS 146")
-        const dept = DEPARTMENT_NAMES[prefix] || prefix; // Find the full department name, default to the prefix
-        
-        await saveCourse({
-          id: courseStr,
-          name: courseStr, // Defaulting the descriptive name to the code for the seed
-          department: dept
-        });
-      }
-
-      alert("Database seeded successfully!");
-      await fetchCourses(); // Refresh the table
+      await removeCourse(courseToDelete);
+      setCourses(prev => prev.filter(course => course.id !== courseToDelete));
+      showToast(`${courseToDelete} has been removed from the catalog.`);
+      setCourseToDelete(null);
     } catch (error) {
-      console.error("Error seeding database:", error);
-      alert("An error occurred during seeding. Check the console.");
-    } finally {
-      setSubmitting(false);
+      console.error("Error deleting course:", error);
+      showErrorToast("Failed to delete course. Please try again.");
     }
   };
 
   if (loading) return <div style={{ padding: '2rem' }}>Loading course catalog...</div>;
 
-  // --- NEW: Filter Logic ---
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           course.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -261,7 +121,6 @@ export const AdminCoursesPage: React.FC = () => {
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h2>Course Catalog Management</h2>
 
-      {/* NEW: Explicit Error Display */}
       {fetchError && (
         <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#991b1b' }}>
           <h3 style={{ marginTop: 0 }}>⚠️ Database Access Denied</h3>
@@ -289,7 +148,7 @@ export const AdminCoursesPage: React.FC = () => {
           />
           <input 
             type="text" 
-            placeholder="Course Name (e.g., Introduction to Data Structures)" 
+            placeholder="Course Name (e.g., Intro to Data Structures)" 
             value={courseName}
             onChange={(e) => setCourseName(e.target.value)}
             required
@@ -317,11 +176,9 @@ export const AdminCoursesPage: React.FC = () => {
         </form>
       </div>
 
-      {/* NEW: Search and Filter Controls */}
+      {/* Search and Filter Controls */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-        {/* Modern Search Input Wrapper */}
         <div style={{ position: 'relative', flex: 1 }}>
-          {/* SVG Search Icon */}
           <div style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -331,9 +188,9 @@ export const AdminCoursesPage: React.FC = () => {
           <input 
             type="text" 
             placeholder="Search courses by code or name..." 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)} 
-            style={{ width: '100%', padding: '0.75rem 1rem 0.85rem 2.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', boxSizing: 'border-box' }} 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', padding: '0.75rem 1rem 0.85rem 2.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', boxSizing: 'border-box' }}
           />
         </div>
         <select 
@@ -347,21 +204,6 @@ export const AdminCoursesPage: React.FC = () => {
           ))}
         </select>
       </div>
-
-      {/* Seed Button (Only shows if DB is empty and there's no fetch error) */}
-      {courses.length === 0 && !fetchError && (
-        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
-          <h3 style={{ marginTop: 0, color: '#166534' }}>Empty Database Detected</h3>
-          <p style={{ color: '#15803d', marginBottom: '1rem' }}>It looks like your course catalog is empty. You can instantly populate it with your 150+ hardcoded default classes.</p>
-          <button 
-            onClick={handleSeedDatabase} 
-            disabled={submitting} 
-            style={{ padding: '0.75rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            {submitting ? 'Seeding Database...' : 'Seed Initial Courses'}
-          </button>
-        </div>
-      )}
 
       {/* Courses List */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem' }}>
@@ -401,9 +243,9 @@ export const AdminCoursesPage: React.FC = () => {
                     Edit
                   </button>
                   <button 
-                    onClick={() => handleDeleteCourse(course.id)}
+                    onClick={() => handleDeleteClick(course.id)}
                     style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
-                    disabled={editingId === course.id} // Disable delete while actively editing this row
+                    disabled={editingId === course.id}
                   >
                     Remove
                   </button>
@@ -420,6 +262,37 @@ export const AdminCoursesPage: React.FC = () => {
           </tbody>
         </table>
       ) : null}
+
+      {/* ------------------------------------------------------------- */}
+      {/* ------------------------- MODALS ---------------------------- */}
+      {/* ------------------------------------------------------------- */}
+
+      {/* 1. Delete Confirmation Modal */}
+      {courseToDelete && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.4rem' }}>Remove Course</h3>
+            <p style={{ color: '#475569', marginBottom: '2rem', lineHeight: '1.5' }}>
+              Are you sure you want to permanently remove <strong>{courseToDelete}</strong> from the catalog? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setCourseToDelete(null)} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

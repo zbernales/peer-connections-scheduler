@@ -577,6 +577,16 @@ function App() {
   });
 
   const navigate = useNavigate();
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000); // Auto-dismisses after 3 seconds
+  };
+
   const location = useLocation();
 
   const showNavbar = location.pathname !== "/login";
@@ -1187,6 +1197,18 @@ const handleExportEducatorCSV = (safeName: string) => {
     doc.save(`${safeName}_educator_itineraries.pdf`);
   };
 
+  {/* --- NEW: Modern Toast Notification UI --- */}
+  {toastMessage && (
+    <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', backgroundColor: '#10b981', color: 'white', padding: '1rem 1.5rem', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 1000, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      {/* Checkmark SVG */}
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+      {toastMessage}
+    </div>
+  )}
+
   return (
   <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
 
@@ -1204,7 +1226,7 @@ const handleExportEducatorCSV = (safeName: string) => {
           <Route path="/submit" element={
             <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
               <TutorForm onSubmit={(newTutor) => {
-                alert(`${newTutor.name}'s availability has been submitted.`);
+                showToast(`${newTutor.name}'s availability has been submitted.`);
               }} />
             </div>
           } />

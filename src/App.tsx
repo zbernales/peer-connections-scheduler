@@ -130,12 +130,13 @@ function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
     <div style={{ maxWidth: '400px', margin: '4rem auto', padding: '2rem', border: '1px solid #cbd5e1', borderRadius: '8px', backgroundColor: 'white', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
       <h2 style={{ marginTop: 0, textAlign: 'center', color: '#1e293b' }}>Admin Access</h2>
       <p style={{ textAlign: 'center', color: '#64748b', marginBottom: '1.5rem' }}>Enter the staff PIN to access the scheduling dashboard.</p>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <input 
           type="password" 
           value={pin} 
           onChange={(e) => setPin(e.target.value)} 
           placeholder="Enter PIN" 
+          autoComplete="new-password"
           autoFocus
           style={{ padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '1.1rem', textAlign: 'center', letterSpacing: '0.2rem' }} 
         />

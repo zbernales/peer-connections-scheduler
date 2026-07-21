@@ -118,11 +118,14 @@ function ProtectedRoute({ isAdmin, children }: { isAdmin: boolean, children: Rea
   return <>{children}</>;
 }
 
-function LoginScreen({ onLogin }: { onLogin: (pin: string) => void }) {
+function LoginScreen({ onLogin, showErrorToast }: { onLogin: (pin: string) => void, showErrorToast: (msg: string) => void }) {
   const [pin, setPin] = useState('');
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pin !== ADMIN_PIN) {
+      showErrorToast('Incorrect PIN.');
+    }
     onLogin(pin);
   };
 
@@ -213,7 +216,6 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                     fontWeight: 'bold', 
                     color: '#64748b', 
                     borderRight: '2px solid #e2e8f0',
-                    // REMOVED borderTop from here so it doesn't extend to the left
                   }}>
                     {format12Hour(floatToTime(t))}
                   </td>
@@ -228,7 +230,6 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                     const bgColor = count === 0 ? '#f8fafc' : `rgba(16, 185, 129, ${Math.max(0.15, intensity)})`;
                     const textColor = intensity > 0.6 ? 'white' : '#1e293b';
 
-                    // Check if it's a weekday for the line
                     const isWeekday = day !== 'Saturday' && day !== 'Sunday';
 
                     return (
@@ -237,7 +238,6 @@ function ScheduleHeatmap({ schedule, config }: { schedule: Shift[], config: Sche
                         borderBottom: '1px solid #e2e8f0',
                         borderRight: '1px solid #e2e8f0',
                         borderLeft: day === 'Saturday' ? '3px solid #334155' : 'none',
-                        // ONLY apply borderTop if it's night AND a weekday
                         borderTop: (isNightStart && isWeekday) ? '3px solid #334155' : 'none', 
                         backgroundColor: bgColor,
                         color: textColor,
@@ -271,7 +271,7 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
   // RESTORED: This merges 30-min blocks into clean, contiguous shifts!
   const mergedShifts = getMergedWeeklySchedule(subjectShifts); 
 
-  // 3. Copy Function Logic (Now uses mergedShifts)
+  // 3. Copy Function Logic
   const handleCopySubject = (e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -282,7 +282,6 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
     } else {
       const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       ALL_DAYS.forEach(day => {
-        // USE mergedShifts HERE so the clipboard text is clean
         const dayShifts = mergedShifts.filter((s: any) => s.day === day);
         if (dayShifts.length > 0) {
           text += `${day}:\n`;
@@ -406,7 +405,7 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
     slot.day === 'Saturday' || slot.day === 'Sunday'
   );
 
-  // --- UPDATED: Initialize from localStorage, falling back to initial availability ---
+  // Initialize from localStorage, falling back to initial availability
   const [showNight, setShowNight] = useState(() => {
     const saved = localStorage.getItem(`admin-pref-night-${tutor.id}`);
     return saved !== null ? JSON.parse(saved) : initiallyHasNight;
@@ -417,7 +416,7 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
     return saved !== null ? JSON.parse(saved) : initiallyHasWeekend;
   });
 
-  // --- NEW: Save preferences to localStorage whenever they change ---
+  // Save preferences to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem(`admin-pref-night-${tutor.id}`, JSON.stringify(showNight));
   }, [showNight, tutor.id]);
@@ -430,8 +429,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   const activeDays = showWeekend 
     ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-
-  // ... (The rest of your useEffects, handleSave, and return statement stay exactly the same) ...
 
   useEffect(() => {
     const initialSet = new Set<string>();
@@ -477,7 +474,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
             <p style={{ margin: '0 0 0.5rem 0' }}><strong>Subjects:</strong> {tutor.subjects.join(', ')}</p>
             <p style={{ margin: '0 0 1rem 0' }}><strong>Hours Target:</strong> {tutor.minHours} - {tutor.maxHours} hrs/week</p>
             
-            {/* --- NEW: Admin Override Checkboxes --- */}
             <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#475569' }}>
                 <input 
@@ -507,7 +503,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
           </div>
         </div>
         
-        {/* Pass the new activeDays array to the grid */}
         <TutorScheduleGrid 
           tutor={tutor} 
           selectedSlots={draftSlots} 
@@ -525,56 +520,88 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   );
 }
 
-function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void, isAdmin: boolean, onLogout: () => void }) {
+function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void, isAdmin: boolean }) {
   const location = useLocation();
   const currentPath = location.pathname;
+  const navigate = useNavigate();
 
-  const handleNavClick = (e: React.MouseEvent) => {
-    if (hasUnsavedChanges) {
-      const confirmLeave = window.confirm("You have a generated schedule that hasn't been saved! If you leave this page, your schedule will be lost. Are you sure you want to leave?");
-      if (!confirmLeave) {
-        e.preventDefault(); 
-      } else {
-        onDiscardChanges();
-      }
+  // --- NEW: Custom Discard Modal State ---
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+
+  const handleNavClick = (e: React.MouseEvent, targetPath: string) => {
+    if (hasUnsavedChanges && currentPath !== targetPath) {
+      e.preventDefault(); 
+      setPendingAction(targetPath); // Open modal instead of navigating
     }
   };
 
+  const confirmDiscard = () => {
+    onDiscardChanges();
+    if (pendingAction) {
+      navigate(pendingAction);
+    }
+    setPendingAction(null);
+  };
+
   return (
-    <nav style={{ backgroundColor: '#1e293b', padding: '1rem', color: 'white', display: 'flex', gap: '1rem', alignItems: 'center', borderRadius: '0 0 8px 8px', marginBottom: '2rem' }}>
-      <h2 style={{ margin: 0, marginRight: 'auto', color: 'white' }}>Peer Connections</h2>
-      
-      <Link onClick={handleNavClick} to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-        Submission Form
-      </Link>
-      
-      {isAdmin && (
-        <>
-          <Link onClick={handleNavClick} to="/generate" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/generate' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-            Schedule Generator
-          </Link>
-          <Link onClick={handleNavClick} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-            Roster Dashboard
-          </Link>
-          <Link onClick={handleNavClick} to="/courses" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/courses' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-            Course Catalog
-          </Link>
-          <Link onClick={handleNavClick} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-            Saved Schedules
-          </Link>
-          <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-            Log Out
-          </button>
-        </>
+    <>
+      <nav style={{ backgroundColor: '#1e293b', padding: '1rem', color: 'white', display: 'flex', gap: '1rem', alignItems: 'center', borderRadius: '0 0 8px 8px', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0, marginRight: 'auto', color: 'white' }}>Peer Connections</h2>
+        
+        <Link onClick={(e) => handleNavClick(e, '/submit')} to="/submit" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/submit' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+          Submission Form
+        </Link>
+        
+        {isAdmin && (
+          <>
+            <Link onClick={(e) => handleNavClick(e, '/generate')} to="/generate" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/generate' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+              Schedule Generator
+            </Link>
+            <Link onClick={(e) => handleNavClick(e, '/admin')} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+              Roster Dashboard
+            </Link>
+            <Link onClick={(e) => handleNavClick(e, '/courses')} to="/courses" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/courses' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+              Course Catalog
+            </Link>
+            <Link onClick={(e) => handleNavClick(e, '/saved')} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+              Saved Schedules
+            </Link>
+          </>
+        )}
+      </nav>
+
+      {/* --- NEW: Custom Discard Confirmation Modal --- */}
+      {pendingAction && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '450px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.4rem' }}>Unsaved Changes</h3>
+            <p style={{ color: '#475569', marginBottom: '2rem', lineHeight: '1.5' }}>
+              You have a generated schedule that hasn't been saved! If you leave this page, your current schedule draft will be permanently lost.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setPendingAction(null)} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDiscard} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Leave & Discard
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </nav>
+    </>
   );
 }
 
 function App() {
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return localStorage.getItem('peerConnectionsAdmin') === 'true';
-  });
+  // Session is forgotten on refresh by relying on basic state without localStorage
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   const navigate = useNavigate();
 
@@ -593,25 +620,16 @@ function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-
   const location = useLocation();
-
   const showNavbar = location.pathname !== "/login";
 
   const handleLogin = (pin: string) => {
     if (pin === ADMIN_PIN) {
       setIsAdmin(true);
-      localStorage.setItem('peerConnectionsAdmin', 'true');
       navigate('/admin'); 
     } else {
-      alert('Incorrect PIN.');
+      showErrorToast('Incorrect PIN.'); // Using custom toast instead of alert
     }
-  };
-
-  const handleLogout = () => {
-    setIsAdmin(false);
-    localStorage.removeItem('peerConnectionsAdmin');
-    navigate('/login'); 
   };
 
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
@@ -628,6 +646,13 @@ function App() {
   const [hoveredTutorId, setHoveredTutorId] = useState<string | null>(null);
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
+  
+  // --- NEW App-Level Modals ---
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [saveNameInput, setSaveNameInput] = useState('');
+  const [tutorToRemove, setTutorToRemove] = useState<{id: string, name: string} | null>(null);
+  const [isProcessingSave, setIsProcessingSave] = useState(false);
+
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
     tutorsPerHour: 8,
     maxConsecutiveHours: 3,
@@ -649,7 +674,6 @@ function App() {
   const [saveStatus, setSaveStatus] = useState<string>('');
 
   const [tutorSearchQuery, setTutorSearchQuery] = useState(''); 
-  // --- NEW: Filters for Tutor Breakdowns ---
   const [tutorSubjectFilter, setTutorSubjectFilter] = useState('');
   const [tutorNightFilter, setTutorNightFilter] = useState(false);
   const [tutorWeekendFilter, setTutorWeekendFilter] = useState(false);
@@ -741,7 +765,7 @@ function App() {
  const handleGenerateSchedule = () => {
     const allowedRoles = scheduleConfig.allowedRoles || ['Tutor', 'SI Leader', 'Mentor'];
     const filteredRoster = globalRoster.filter(tutor => {
-      const role = (tutor as any).role || 'Tutor'; // Fallback to 'Tutor' for older data
+      const role = (tutor as any).role || 'Tutor';
       return allowedRoles.includes(role);
     });
     const generated = generateSchedule(filteredRoster, scheduleConfig);
@@ -767,33 +791,38 @@ function App() {
     setSelectedTutorModal(null); 
   };
 
-    const handleSaveAsNew = async (): Promise<string | null> => {
+  // --- NEW: Save As New Modal Logic ---
+  const handleSaveClick = () => {
     if (schedule.length === 0) {
-      alert("There is no schedule to save! Generate one first.");
-      return null;
+      showErrorToast("There is no schedule to save! Generate one first.");
+      return;
     }
+    setSaveNameInput('');
+    setIsSaveModalOpen(true);
+  };
 
-    const scheduleName = window.prompt("Enter a name for this schedule:");
-    if (!scheduleName) return null; 
+  const confirmSaveAsNew = async () => {
+    if (!saveNameInput.trim()) return;
 
+    setIsProcessingSave(true);
     try {
       const docRef = await addDoc(collection(db, 'schedules'), {
-        name: scheduleName,
+        name: saveNameInput.trim(),
         createdAt: Date.now(),
         shifts: schedule,
         roster: activeRoster 
       });
-      setActiveScheduleMeta({ id: docRef.id, name: scheduleName });
-      alert(`"${scheduleName}" has been securely saved to the database!`);
-      return scheduleName;
+      setActiveScheduleMeta({ id: docRef.id, name: saveNameInput.trim() });
+      showToast(`"${saveNameInput.trim()}" has been securely saved!`);
+      setIsSaveModalOpen(false);
     } catch (error) {
       console.error("Error saving schedule:", error);
-      alert("Failed to save schedule.");
-      return null;
+      showErrorToast("Failed to save schedule.");
+    } finally {
+      setIsProcessingSave(false);
     }
   };
 
-  
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
   const handleCopySchedule = (tutor: any, tutorShifts: any[], totalHours: number, e: React.MouseEvent) => {
@@ -805,7 +834,6 @@ function App() {
     if (tutorShifts.length === 0) {
       text += "No shifts scheduled.\n";
     } else {
-      // DAYS should refer to the same array you map over in the UI (e.g., ['Monday', 'Tuesday', ...])
       DAYS.forEach(day => {
         const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter((s: any) => s.day === day);
         if (shiftsForThisDay.length > 0) {
@@ -818,29 +846,34 @@ function App() {
       });
     }
 
-    // Secure cross-browser clipboard copy
     const textArea = document.createElement("textarea");
     textArea.value = text.trim();
     document.body.appendChild(textArea);
     textArea.select();
     try {
       document.execCommand('copy');
-      // Show visual confirmation!
       setCopiedTutorId(tutor.id);
+      showToast('Schedule copied to clipboard!'); // Polish: Add toast confirming copy
       setTimeout(() => setCopiedTutorId(null), 2000); 
     } catch (err) {
       console.error('Failed to copy schedule', err);
+      showErrorToast("Failed to copy schedule.");
     }
     document.body.removeChild(textArea);
   };
 
-  const handleRemoveTutorFromSchedule = (tutorId: string, tutorName: string, e: React.MouseEvent) => {
+  // --- NEW: Remove Tutor Modal Logic ---
+  const handleRemoveTutorClick = (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
-    
-    if (window.confirm(`Are you sure you want to remove ${tutorName} from this schedule? This will also delete all of their assigned shifts.`)) {
-      setActiveRoster(prev => prev.filter(t => t.id !== tutorId));
-      setSchedule(prev => prev.filter(s => s.tutorId !== tutorId));
-    }
+    setTutorToRemove({ id: tutorId, name: tutorName });
+  };
+
+  const confirmRemoveTutor = () => {
+    if (!tutorToRemove) return;
+    setActiveRoster(prev => prev.filter(t => t.id !== tutorToRemove.id));
+    setSchedule(prev => prev.filter(s => s.tutorId !== tutorToRemove.id));
+    showToast(`${tutorToRemove.name} removed from the schedule.`);
+    setTutorToRemove(null);
   };
 
   const missingTutors = globalRoster.filter(globalTutor => 
@@ -873,38 +906,33 @@ function App() {
     sub.toLowerCase().includes(subjectSearchQuery.toLowerCase())
   );
 
-  // --- UPDATED: Tutor filtering logic including Name, Subject, and Night Availability ---
   const filteredTutors = activeRoster.filter(tutor => {
-  const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
-  const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
-  
-  const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
-  const matchesNight = !tutorNightFilter || hasNightAvailability;
+    const matchesName = tutor.name.toLowerCase().includes(tutorSearchQuery.toLowerCase());
+    const matchesSubject = tutorSubjectFilter === '' || tutor.subjects.includes(tutorSubjectFilter);
+    
+    const hasNightAvailability = tutor.availability.some(slot => timeToFloat(slot.endTime) > 17);
+    const matchesNight = !tutorNightFilter || hasNightAvailability;
 
-  // --- NEW: Weekend filter logic ---
-  const hasWeekendAvailability = tutor.availability.some(slot => slot.day === 'Saturday' || slot.day === 'Sunday');
-  const matchesWeekend = !tutorWeekendFilter || hasWeekendAvailability;
+    const hasWeekendAvailability = tutor.availability.some(slot => slot.day === 'Saturday' || slot.day === 'Sunday');
+    const matchesWeekend = !tutorWeekendFilter || hasWeekendAvailability;
 
-  return matchesName && matchesSubject && matchesNight && matchesWeekend;
-});
+    return matchesName && matchesSubject && matchesNight && matchesWeekend;
+  });
 
- // --- NEW: EXPORT WRAPPER ---
   const executeExport = async (exportFn: (safeName: string, rawName: string) => void) => {
     setShowExportModal(false);
-    let sName: string | undefined | null = activeScheduleMeta?.name; // <-- Add explicit type here
+    let sName: string | undefined | null = activeScheduleMeta?.name;
 
     if (!sName) {
-      alert("Please save and name this schedule before exporting.");
-      sName = await handleSaveAsNew();
-      if (!sName) return; // User cancelled or failed to save
+      // Replaced ugly prompt chain with simple error toast
+      showErrorToast("Please click 'Save to Database' to name and save this schedule before exporting.");
+      return; 
     }
 
-    // Create a safe, URL-friendly filename (e.g. "Fall 2026!" -> "fall_2026")
     const safeName = sName.replace(/[^a-z0-9]+/gi, '_').replace(/(^_|_$)/g, '').toLowerCase();
     exportFn(safeName, sName);
   };
 
-// --- EXPORT LOGIC ---
   const getExportData = () => {
     const mergedShifts = getMergedWeeklySchedule(schedule);
     const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -965,13 +993,10 @@ function App() {
     doc.save(`${safeName}_master_schedule.pdf`);
   };
 
-  // --- SUBJECT EXPORT LOGIC ---
   const getSubjectExportData = () => {
-    // 1. Get the cleanly merged shifts
     const mergedShifts = getMergedWeeklySchedule(schedule);
     const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    // 2. "Unroll" the data so a shift covering 3 subjects becomes 3 rows
     const unrolledData: any[] = [];
 
     mergedShifts.forEach((shift: any) => {
@@ -989,13 +1014,11 @@ function App() {
           'End Time': end,
           'Educator Name': tutorName,
           Role: role,
-          _rawStart: shift.startTime // kept for accurate sorting
+          _rawStart: shift.startTime 
         });
       });
-
     });
 
-    // 3. Sort by Subject first, then Day, then Time
     return unrolledData.sort((a, b) => {
       if (a.Subject !== b.Subject) return a.Subject.localeCompare(b.Subject);
       if (a.Day !== b.Day) return ALL_DAYS.indexOf(a.Day) - ALL_DAYS.indexOf(b.Day);
@@ -1056,13 +1079,10 @@ function App() {
     doc.save(`${safeName}_subject_coverage.pdf`);
   };
   
- // --- EDUCATOR SCHEDULE EXPORT LOGIC ("TIMESHEET" & "ITINERARY") ---
 const getEducatorTimesheetData = () => {
-  // 1. Get the cleanly merged shifts (prevents overlapping 30min blocks)
   const mergedShifts = getMergedWeeklySchedule(schedule);
   const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  // 2. Group shifts by tutorId
   const shiftsByTutor = new Map<string, any[]>();
   mergedShifts.forEach((shift: any) => {
     if (!shiftsByTutor.has(shift.tutorId)) shiftsByTutor.set(shift.tutorId, []);
@@ -1071,24 +1091,21 @@ const getEducatorTimesheetData = () => {
 
   const timesheetData: any[] = [];
 
-  // 3. Sort roster alphabetically so the timesheet is alphabetical by staff member
   const sortedRoster = [...activeRoster].sort((a, b) => a.name.localeCompare(b.name));
 
   sortedRoster.forEach(tutor => {
     const tutorShifts = shiftsByTutor.get(tutor.id) || [];
-    if (tutorShifts.length === 0) return; // Skip if they aren't working this week
+    if (tutorShifts.length === 0) return; 
 
     const role = (tutor as any).role || 'Tutor';
     const subjectsStr = tutor.subjects.join(", ");
 
-    // Sort this person's shifts by day, then time
     tutorShifts.sort((a, b) => {
       if (a.day !== b.day) return ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day);
       return a.startTime.localeCompare(b.startTime);
     });
 
     tutorShifts.forEach(shift => {
-      // Calculate duration
       const duration = timeToFloat(shift.endTime) - timeToFloat(shift.startTime);
       
       timesheetData.push({
@@ -1136,7 +1153,6 @@ const handleExportEducatorCSV = (safeName: string) => {
     const printDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     doc.setFontSize(18);
     doc.text(`${rawName} - Educator Itineraries`, 14, 20);
-    // ... rest of the existing PDF logic remains identical ...
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Generated: ${printDate}`, 14, 27);
@@ -1232,7 +1248,6 @@ const handleExportEducatorCSV = (safeName: string) => {
         hasUnsavedChanges={hasUnsavedChanges}
         onDiscardChanges={handleDiscardUnsavedChanges}
         isAdmin={isAdmin}
-        onLogout={handleLogout}
       />
     )}
 
@@ -1244,7 +1259,6 @@ const handleExportEducatorCSV = (safeName: string) => {
                 onSubmit={(newTutor) => {
                   showToast(`${newTutor.name}'s availability has been submitted.`);
                 }} 
-                showToast={showToast}
                 showErrorToast={showErrorToast}
               />
             </div>
@@ -1265,7 +1279,7 @@ const handleExportEducatorCSV = (safeName: string) => {
           <Route path="/" element={<Navigate to="/submit" replace />} />
 
           <Route path="/login" element={
-            isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} />
+            isAdmin ? <Navigate to="/admin" replace /> : <LoginScreen onLogin={handleLogin} showErrorToast={showErrorToast} />
           } />
 
          <Route path="/admin" element={
@@ -1324,7 +1338,7 @@ const handleExportEducatorCSV = (safeName: string) => {
                           {saveStatus && <span style={{ marginLeft: '6px', color: saveStatus === 'Error saving' ? '#ef4444' : '#10b981' }}>({saveStatus})</span>}
                         </span>
                         
-                        <button onClick={handleSaveAsNew} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>
+                        <button onClick={handleSaveClick} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)' }}>
                           <svg 
                             xmlns="http://www.w3.org/2000/svg" 
                             fill="none" 
@@ -1339,7 +1353,7 @@ const handleExportEducatorCSV = (safeName: string) => {
                         </button>
                       </>
                     ) : (
-                      <button onClick={handleSaveAsNew} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <button onClick={handleSaveClick} style={{ padding: '0.5rem 1rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0v3.75C20.25 19.903 16.556 21.75 12 21.75s-8.25-1.847-8.25-4.125v-3.75" />
                         </svg>
@@ -1655,7 +1669,7 @@ const handleExportEducatorCSV = (safeName: string) => {
                                           </button>
 
                                           <button
-                                            onClick={(e) => handleRemoveTutorFromSchedule(tutor.id, tutor.name, e)}
+                                            onClick={(e) => handleRemoveTutorClick(tutor.id, tutor.name, e)}
                                             style={{ 
                                               background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
                                               display: 'flex',
@@ -1862,6 +1876,75 @@ const handleExportEducatorCSV = (safeName: string) => {
 
         </Routes>
       </div>
+
+      {/* --- NEW App-Level Modals --- */}
+
+      {/* 1. Save As New Modal */}
+      {isSaveModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '500px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.4rem', marginBottom: '1rem' }}>Save Schedule</h3>
+            
+            <input 
+              type="text" 
+              value={saveNameInput}
+              onChange={(e) => setSaveNameInput(e.target.value)}
+              placeholder="Enter a name for this schedule..."
+              disabled={isProcessingSave}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmSaveAsNew();
+                if (e.key === 'Escape') setIsSaveModalOpen(false);
+              }}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '1.1rem', marginBottom: '2rem', boxSizing: 'border-box' }}
+            />
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setIsSaveModalOpen(false)} 
+                disabled={isProcessingSave}
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: isProcessingSave ? 'not-allowed' : 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmSaveAsNew} 
+                disabled={isProcessingSave || !saveNameInput.trim()}
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: (isProcessingSave || !saveNameInput.trim()) ? 'not-allowed' : 'pointer', transition: 'background-color 0.2s' }}
+              >
+                {isProcessingSave ? 'Saving...' : 'Save to Database'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Remove Tutor Modal */}
+      {tutorToRemove && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '450px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '1.4rem' }}>Remove from Schedule</h3>
+            <p style={{ color: '#475569', marginBottom: '2rem', lineHeight: '1.5' }}>
+              Are you sure you want to remove <strong>{tutorToRemove.name}</strong> from this schedule? This will also delete all of their assigned shifts.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setTutorToRemove(null)} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmRemoveTutor} 
+                style={{ padding: '0.6rem 1.25rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

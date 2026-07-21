@@ -304,7 +304,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
               </div>
             <input
               type="text"
-              placeholder="Search subjects to prioritize (e.g., CS 146)..."
+              placeholder="Search subjects to prioritize..."
               value={subjectSearchTerm}
               onChange={(e) => {
                 setSubjectSearchTerm(e.target.value);

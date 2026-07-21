@@ -10,9 +10,12 @@ interface TutorFormProps {
   onSubmit: (newTutor: Tutor) => void;
   initialData?: Tutor; 
   onCancel?: () => void; 
+  // --- NEW: Add toast props ---
+  showToast?: (message: string) => void;
+  showErrorToast?: (message: string) => void;
 }
 
-export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
+export function TutorForm({ onSubmit, initialData, onCancel, showToast, showErrorToast }: TutorFormProps) {
   // --- NEW: Role state added ---
   const [role, setRole] = useState((initialData as any)?.role || 'Tutor');
   const [name, setName] = useState(initialData?.name || '');
@@ -75,7 +78,12 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
     e.preventDefault();
 
     if (selectedSlots.size === 0) {
-      alert("Please highlight at least one available time slot!");
+      // --- NEW: Use error toast ---
+      if (showErrorToast) {
+        showErrorToast("Please highlight at least one available time slot.");
+      } else {
+        alert("Please highlight at least one available time slot.");
+      }
       return;
     }
 
@@ -144,7 +152,12 @@ export function TutorForm({ onSubmit, initialData, onCancel }: TutorFormProps) {
       }
     } catch (error) {
       console.error("Error adding document: ", error);
-      alert("Failed to save to database. Check the console.");
+      // --- NEW: Use error toast ---
+      if (showErrorToast) {
+        showErrorToast("Failed to save to database. Please try again.");
+      } else {
+        alert("Failed to save to database. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }

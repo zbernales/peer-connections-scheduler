@@ -579,13 +579,20 @@ function App() {
   const navigate = useNavigate();
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
 
   const showToast = (message: string) => {
     setToastMessage(message);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3000); // Auto-dismisses after 3 seconds
+    setToastType('success');
+    setTimeout(() => setToastMessage(null), 3000);
   };
+
+  const showErrorToast = (message: string) => {
+    setToastMessage(message);
+    setToastType('error');
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
 
   const location = useLocation();
 
@@ -1202,15 +1209,24 @@ const handleExportEducatorCSV = (safeName: string) => {
   <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
       {/* --- NEW: Modern Toast Notification UI --- */}
     {toastMessage && (
-      <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', backgroundColor: '#10b981', color: 'white', padding: '1rem 1.5rem', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 1000, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        {/* Checkmark SVG */}
+    <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', backgroundColor: toastType === 'error' ? '#ef4444' : '#10b981', color: 'white', padding: '1rem 1.5rem', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 1000, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      {toastType === 'error' ? (
+        /* Error Alert SVG */
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      ) : (
+        /* Checkmark SVG */
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
           <polyline points="22 4 12 14.01 9 11.01"></polyline>
         </svg>
-        {toastMessage}
-      </div>
-    )}
+      )}
+      {toastMessage}
+    </div>
+  )}
     {showNavbar && (
       <NavBar
         hasUnsavedChanges={hasUnsavedChanges}
@@ -1222,13 +1238,18 @@ const handleExportEducatorCSV = (safeName: string) => {
 
     <div style={{ padding: '0 2rem 2rem 2rem' }}>
       <Routes>
-          <Route path="/submit" element={
+           <Route path="/submit" element={
             <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-              <TutorForm onSubmit={(newTutor) => {
-                showToast(`${newTutor.name}'s availability has been submitted.`);
-              }} />
+              <TutorForm 
+                onSubmit={(newTutor) => {
+                  showToast(`${newTutor.name}'s availability has been submitted.`);
+                }} 
+                showToast={showToast}
+                showErrorToast={showErrorToast}
+              />
             </div>
           } />
+
 
           {/* --- NEW: Course Catalog Route --- */}
           <Route path="/courses" element={

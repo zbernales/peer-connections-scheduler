@@ -15,7 +15,7 @@ interface TutorFormProps {
   showErrorToast?: (message: string) => void;
 }
 
-export function TutorForm({ onSubmit, initialData, onCancel, showToast, showErrorToast }: TutorFormProps) {
+export function TutorForm({ onSubmit, initialData, onCancel, showErrorToast }: TutorFormProps) {
   // --- NEW: Role state added ---
   const [role, setRole] = useState((initialData as any)?.role || 'Tutor');
   const [name, setName] = useState(initialData?.name || '');

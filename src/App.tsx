@@ -520,7 +520,7 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
   );
 }
 
-function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void, isAdmin: boolean }) {
+function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { hasUnsavedChanges: boolean, onDiscardChanges: () => void, isAdmin: boolean, onLogout: () => void }) {
   const location = useLocation();
   const currentPath = location.pathname;
   const navigate = useNavigate();
@@ -566,6 +566,11 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin }: { hasUnsavedCh
             <Link onClick={(e) => handleNavClick(e, '/saved')} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
               Saved Schedules
             </Link>
+            
+            {/* --- RESTORED: Log Out Button --- */}
+            <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              Log Out
+            </button>
           </>
         )}
       </nav>
@@ -630,6 +635,12 @@ function App() {
     } else {
       showErrorToast('Incorrect PIN.'); // Using custom toast instead of alert
     }
+  };
+
+  // --- RESTORED: handleLogout function ---
+  const handleLogout = () => {
+    setIsAdmin(false);
+    navigate('/submit'); 
   };
 
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
@@ -1248,6 +1259,7 @@ const handleExportEducatorCSV = (safeName: string) => {
         hasUnsavedChanges={hasUnsavedChanges}
         onDiscardChanges={handleDiscardUnsavedChanges}
         isAdmin={isAdmin}
+        onLogout={handleLogout} // <--- Make sure this line is here!
       />
     )}
 

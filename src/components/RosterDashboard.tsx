@@ -19,6 +19,7 @@ const ROLE_COLORS: Record<string, { bg: string, text: string }> = {
   'Tutor': { bg: '#e0f2fe', text: '#0369a1' },       // Light Blue
   'SI Leader': { bg: '#f3e8ff', text: '#7e22ce' },   // Light Purple
   'Mentor': { bg: '#dcfce7', text: '#15803d' },      // Light Green
+  'Learning Assistant': { bg: '#dcfce7', text: '#e65353' },
 };
 
 export function RosterDashboard({ roster, onSelectTutor, showToast, showErrorToast }: RosterDashboardProps) {

@@ -322,7 +322,7 @@ export function TutorForm({ onSubmit, initialData, onCancel, showErrorToast }: T
             fontSize: '1.1rem', 
           }}
         >
-          {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Save Tutor')}
+          {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Save Peer Educator')}
         </button>
 
         {onCancel && (

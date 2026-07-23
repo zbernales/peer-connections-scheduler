@@ -11,7 +11,7 @@ interface ScheduleGenerationPageProps {
 
 export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, globalRoster }: ScheduleGenerationPageProps) {
   const navigate = useNavigate();
-  const allowedRoles = config.allowedRoles || ['Tutor', 'Mentor', 'SI Leader', 'Learning Assistant'];
+  const allowedRoles = config.allowedRoles || ['Tutor', 'Mentor', 'SI Leader'];
 
   const handleRoleToggle = (role: string) => {
     const newRoles = allowedRoles.includes(role)

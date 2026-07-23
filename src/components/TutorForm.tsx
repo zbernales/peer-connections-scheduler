@@ -183,7 +183,7 @@ export function TutorForm({ onSubmit, initialData, onCancel, showErrorToast }: T
             <option value="Tutor">Tutor</option>
             <option value="SI Leader">Mentor</option>
             <option value="Mentor">SI Leader</option>
-            <option value="Mentor">Learning Assistant</option>
+            <option value="Learning Assistant">Learning Assistant</option>
           </select>
         </div>
 

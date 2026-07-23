@@ -567,7 +567,6 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
               Saved Schedules
             </Link>
             
-            {/* --- RESTORED: Log Out Button --- */}
             <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
               Log Out
             </button>
@@ -605,8 +604,9 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
 }
 
 function App() {
-  // Session is forgotten on refresh by relying on basic state without localStorage
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return localStorage.getItem('peerConnectionsAdmin') === 'true';
+  });
 
   const navigate = useNavigate();
 
@@ -631,16 +631,17 @@ function App() {
   const handleLogin = (pin: string) => {
     if (pin === ADMIN_PIN) {
       setIsAdmin(true);
+      localStorage.setItem('peerConnectionsAdmin', 'true');
       navigate('/admin'); 
     } else {
       showErrorToast('Incorrect PIN.'); // Using custom toast instead of alert
     }
   };
 
-  // --- RESTORED: handleLogout function ---
   const handleLogout = () => {
     setIsAdmin(false);
-    navigate('/submit'); 
+    localStorage.removeItem('peerConnectionsAdmin');
+    navigate('/login'); 
   };
 
   const [globalRoster, setGlobalRoster] = useState<Tutor[]>([]);
@@ -1259,7 +1260,7 @@ const handleExportEducatorCSV = (safeName: string) => {
         hasUnsavedChanges={hasUnsavedChanges}
         onDiscardChanges={handleDiscardUnsavedChanges}
         isAdmin={isAdmin}
-        onLogout={handleLogout} // <--- Make sure this line is here!
+        onLogout={handleLogout} 
       />
     )}
 

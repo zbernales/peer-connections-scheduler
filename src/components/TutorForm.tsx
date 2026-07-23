@@ -181,8 +181,9 @@ export function TutorForm({ onSubmit, initialData, onCancel, showErrorToast }: T
             style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: 'white' }}
           >
             <option value="Tutor">Tutor</option>
-            <option value="SI Leader">SI Leader</option>
-            <option value="Mentor">Mentor</option>
+            <option value="SI Leader">Mentor</option>
+            <option value="Mentor">SI Leader</option>
+            <option value="Mentor">Learning Assistant</option>
           </select>
         </div>
 

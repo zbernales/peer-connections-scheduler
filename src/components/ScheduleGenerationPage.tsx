@@ -11,7 +11,7 @@ interface ScheduleGenerationPageProps {
 
 export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, globalRoster }: ScheduleGenerationPageProps) {
   const navigate = useNavigate();
-  const allowedRoles = config.allowedRoles || ['Tutor', 'SI Leader', 'Mentor'];
+  const allowedRoles = config.allowedRoles || ['Tutor', 'Mentor', 'SI Leader', 'Learning Assistant'];
 
   const handleRoleToggle = (role: string) => {
     const newRoles = allowedRoles.includes(role)
@@ -172,7 +172,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
 
           {config.autoScheduleNightHours && (
             <div style={{ paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-              <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', color: '#475569', fontWeight: 'bold' }}>Max Tutors Per Night Shift</label>
+              <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', color: '#475569', fontWeight: 'bold' }}>Max Educators Per Night Shift</label>
               <input
                 type="number"
                 min="1"
@@ -202,7 +202,7 @@ export function ScheduleGenerationPage({ config, onConfigChange, onGenerate, glo
 
           {config.autoScheduleWeekendHours && (
             <div style={{ paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-              <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', color: '#475569', fontWeight: 'bold' }}>Max Tutors Per Weekend Shift</label>
+              <label style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.5rem', color: '#475569', fontWeight: 'bold' }}>Max Educators Per Weekend Shift</label>
               <input
                 type="number"
                 min="1"

@@ -278,9 +278,10 @@ export function RosterDashboard({ roster, onSelectTutor, showToast, showErrorToa
           style={{ padding: '0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', backgroundColor: 'white', minWidth: '180px', cursor: 'pointer' }}
         >
           <option value="All">All Roles</option>
-          <option value="Tutor">Tutors</option>
-          <option value="SI Leader">SI Leaders</option>
+          <option value="Tutor">Tutors</option>       
           <option value="Mentor">Mentors</option>
+          <option value="SI Leader">SI Leaders</option>    
+          <option value="Learning Assistant">Learning Assistants</option>
         </select>
       </div>
 

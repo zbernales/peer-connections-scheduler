@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Tutor } from '../types';
+import type { Tutor, Location } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
 interface TutorScheduleGridProps {
@@ -8,6 +8,10 @@ interface TutorScheduleGridProps {
   onChange: (newSlots: Set<string>) => void; 
   endHour?: number;
   days: string[];
+  // --- NEW PROPS FOR LOCATIONS ---
+  locationsList?: Location[];
+  slotLocations?: Record<string, string>;
+  onLocationChangeRequest?: (slotId: string, newLoc: string) => void;
 }
 
 function buildSlotSet(items: { day: string; startTime: string; endTime: string }[]) {
@@ -28,7 +32,10 @@ export function TutorScheduleGrid({
   selectedSlots, 
   onChange, 
   endHour = 17, 
-  days 
+  days,
+  locationsList = [],
+  slotLocations = {},
+  onLocationChangeRequest
 }: TutorScheduleGridProps) {
   const availableSlots = buildSlotSet(tutor.availability);
   
@@ -51,8 +58,6 @@ export function TutorScheduleGrid({
     return generatedTimes;
   }, [endHour]);
 
-  // --- THE FIX: Calculate exactly how many rows the grid will have ---
-  // 1 Header row + 1 row for each time slot + 1 extra row if the horizontal night line renders
   const showNightLine = times.includes('17:00') && weekdays.length > 0;
   const totalRows = 1 + times.length + (showNightLine ? 1 : 0);
 
@@ -95,6 +100,8 @@ export function TutorScheduleGrid({
     else if (isScheduled && !isAvailable) bgColor = '#fca5a5'; 
     else if (!isScheduled && isAvailable) bgColor = '#bfdbfe'; 
 
+    const currentLoc = slotLocations[cellId] || 'SSC 600';
+
     return (
       <div
         key={cellId}
@@ -102,13 +109,43 @@ export function TutorScheduleGrid({
         onMouseEnter={() => handleMouseEnter(cellId)}
         title="Click and drag to toggle shift"
         style={{
-          height: '24px',
+          height: '28px', // Slightly taller to fit the select dropdown
           backgroundColor: bgColor,
           border: '1px solid #cbd5e1',
           borderRadius: '2px',
           cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative'
         }}
-      />
+      >
+        {isScheduled && locationsList.length > 0 && onLocationChangeRequest && (
+          <select
+            value={currentLoc}
+            onMouseDown={(e) => e.stopPropagation()} // Prevents dragging when clicking dropdown
+            onChange={(e) => onLocationChangeRequest(cellId, e.target.value)}
+            style={{
+              width: '90%',
+              height: '80%',
+              fontSize: '0.65rem',
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: 'none',
+              outline: 'none',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              borderRadius: '2px',
+              textAlign: 'center'
+            }}
+          >
+            <option value="SSC 600" style={{ color: 'black' }}>SSC 600</option>
+            {locationsList.map(l => (
+              <option key={l.id} value={l.name} style={{ color: 'black' }}>{l.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
     );
   };
 
@@ -146,15 +183,14 @@ export function TutorScheduleGrid({
           </div>
         ))}
 
-        {/* --- THE SOLID VERTICAL LINE --- */}
         {showSeparator && (
           <div style={{
             gridColumn: weekdays.length + 2,
-            gridRow: `1 / span ${totalRows}`, // <-- Now explicitly spans the exact calculated rows
+            gridRow: `1 / span ${totalRows}`,
             width: '3px',
             backgroundColor: '#334155',
             justifySelf: 'center',
-            alignSelf: 'stretch', // Ensures it stretches vertically
+            alignSelf: 'stretch',
             borderRadius: '2px',
             zIndex: 1
           }} />
@@ -172,11 +208,9 @@ export function TutorScheduleGrid({
           return (
             <div style={{ display: 'contents' }} key={time}>
     
-              {/* --- UPDATED: The Horizontal Line --- */}
               {isNightStart && weekdays.length > 0 && (
                 <>
                   <div style={{
-                    // Start at column 2 (skipping the time sidebar) and span the weekdays
                     gridColumn: `2 / span ${weekdays.length}`, 
                     height: '3px',
                     backgroundColor: '#334155',
@@ -184,7 +218,6 @@ export function TutorScheduleGrid({
                     marginBottom: '0.75rem', 
                     borderRadius: '2px'
                   }} />
-                  {/* Invisible filler to keep the layout consistent on the weekend side */}
                   {showSeparator && (
                     <div style={{ gridColumn: `${weekdays.length + 3} / -1` }} />
                   )}
@@ -212,7 +245,7 @@ export function TutorScheduleGrid({
         })}
       </div>
       <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', marginTop: '1rem' }}>
-        * Click and drag to quickly paint or erase shifts for this tutor.
+        * Click and drag to quickly paint or erase shifts for this tutor. Use dropdowns inside blocks to change location.
       </p>
     </div>
   );

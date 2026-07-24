@@ -114,7 +114,7 @@ export function AdminLocationsPage({ showToast, showErrorToast }: AdminLocations
             <label style={{ display: 'block', fontSize: '0.9rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 'bold' }}>Location Name / Building / URL</label>
             <input 
               type="text" 
-              placeholder="e.g., SSC 600 or Zoom Link" 
+              placeholder="e.g., SSC 600" 
               value={locationName}
               onChange={(e) => setLocationName(e.target.value)}
               required

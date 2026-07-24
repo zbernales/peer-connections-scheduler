@@ -202,7 +202,8 @@ export function generateSchedule(tutors: Tutor[], config: ScheduleConfig): Shift
           subjects: winner.subjects,
           day: day,
           startTime: floatToTime(timeSlot),
-          endTime: floatToTime(timeSlot + 0.5) 
+          endTime: floatToTime(timeSlot + 0.5),
+          location: 'SSC 600' // <-- Default location applied here
         });
 
         hoursAssigned[winner.id] += 0.5;

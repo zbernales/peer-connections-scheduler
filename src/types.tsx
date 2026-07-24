@@ -22,6 +22,13 @@ export interface Shift {
   day: DayOfWeek;
   startTime: string;
   endTime: string;
+  location?: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  type: 'In-Person' | 'Virtual';
 }
 
 export interface ScheduleConfig {

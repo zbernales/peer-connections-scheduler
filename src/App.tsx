@@ -10,7 +10,9 @@ import { TutorScheduleGrid } from './components/TutorScheduleGrid';
 import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
 import { AdminCoursesPage } from './components/AdminCoursesPage';
 import { ScheduleGenerationPage } from './components/ScheduleGenerationPage';
-import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
+import { AdminLocationsPage } from './components/AdminLocationsPage';
+import { getAllLocations } from './services/locationService'; // <-- NEW IMPORT
+import type { Tutor, DayOfWeek, ScheduleConfig, Shift, Location } from './types'; // <-- UPDATED TYPES
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -79,13 +81,17 @@ function format12Hour(time24: string): string {
   return `${hr12}${minStr}${ampm}`;
 }
 
+// --- UPDATED: Merging logic now checks if the Location is identical before grouping blocks ---
 function mergeShiftsForUI(shifts: any[]) {
   if (shifts.length === 0) return [];
   const merged = [];
   let currentBlock = { ...shifts[0], shiftIds: [shifts[0].id] };
   for (let i = 1; i < shifts.length; i++) {
     const nextShift = shifts[i];
-    if (nextShift.day === currentBlock.day && nextShift.startTime === currentBlock.endTime && nextShift.tutorId === currentBlock.tutorId) {
+    if (nextShift.day === currentBlock.day && 
+        nextShift.startTime === currentBlock.endTime && 
+        nextShift.tutorId === currentBlock.tutorId &&
+        (nextShift.location || 'SSC 600') === (currentBlock.location || 'SSC 600')) {
       currentBlock.endTime = nextShift.endTime;
       currentBlock.shiftIds.push(nextShift.id); 
     } else {
@@ -291,7 +297,8 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
             const tutor = activeRoster.find((t: any) => t.id === shift.tutorId);
             const tutorName = tutor ? tutor.name : 'Unknown Educator';
             const role = tutor && tutor.role ? tutor.role : 'Tutor';
-            text += `- ${format12Hour(shift.startTime)} to ${format12Hour(shift.endTime)} (${tutorName}, ${role})\n`;
+            const loc = shift.location || 'SSC 600'; // Location added to copy
+            text += `- ${format12Hour(shift.startTime)} to ${format12Hour(shift.endTime)} (${tutorName}, ${role} @ ${loc})\n`;
           });
           text += '\n';
         }
@@ -372,9 +379,10 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
                   <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
                   {dayShifts.map((block: any, index: number) => {
                     const tutorName = activeRoster.find((t: any) => t.id === block.tutorId)?.name || 'Unknown';
+                    const loc = block.location || 'SSC 600';
                     return (
                       <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
-                        {format12Hour(block.startTime)} - {format12Hour(block.endTime)}: <span style={{ color: '#3b82f6', fontWeight: '500' }}>{tutorName}</span>
+                        {format12Hour(block.startTime)} - {format12Hour(block.endTime)}: <span style={{ color: '#3b82f6', fontWeight: '500' }}>{tutorName}</span> <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>({loc})</span>
                       </div>
                     );
                   })}
@@ -394,10 +402,18 @@ export function SubjectCard({ subject, schedule, activeRoster, hoveredSubject, s
   );
 }
 
+// --- UPDATED: Editor Modal now handles locations state, logic, and modals ---
 function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: any) {
   const [draftSlots, setDraftSlots] = useState<Set<string>>(new Set());
+  const [draftLocations, setDraftLocations] = useState<Record<string, string>>({});
+  const [locationsList, setLocationsList] = useState<Location[]>([]);
 
-  // Check if they initially submitted night/weekend availability
+  const [locationPrompt, setLocationPrompt] = useState<{slotId: string, newLoc: string} | null>(null);
+
+  useEffect(() => {
+    getAllLocations().then(setLocationsList).catch(console.error);
+  }, []);
+
   const initiallyHasNight = tutor.availability.some((slot: any) => 
     timeToFloat(slot.endTime) > 17 && slot.day !== 'Saturday' && slot.day !== 'Sunday'
   );
@@ -405,7 +421,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
     slot.day === 'Saturday' || slot.day === 'Sunday'
   );
 
-  // Initialize from localStorage, falling back to initial availability
   const [showNight, setShowNight] = useState(() => {
     const saved = localStorage.getItem(`admin-pref-night-${tutor.id}`);
     return saved !== null ? JSON.parse(saved) : initiallyHasNight;
@@ -416,7 +431,6 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
     return saved !== null ? JSON.parse(saved) : initiallyHasWeekend;
   });
 
-  // Save preferences to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem(`admin-pref-night-${tutor.id}`, JSON.stringify(showNight));
   }, [showNight, tutor.id]);
@@ -432,16 +446,55 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
 
   useEffect(() => {
     const initialSet = new Set<string>();
+    const initialLocs: Record<string, string> = {};
     currentSchedule.forEach((shift: any) => {
       let current = timeToFloat(shift.startTime);
       const end = timeToFloat(shift.endTime);
       while(current < end) {
-        initialSet.add(`${shift.day}-${floatToTime(current)}`);
+        const slotId = `${shift.day}-${floatToTime(current)}`;
+        initialSet.add(slotId);
+        initialLocs[slotId] = shift.location || 'SSC 600';
         current += 0.5;
       }
     });
     setDraftSlots(initialSet);
+    setDraftLocations(initialLocs);
   }, [currentSchedule]);
+
+  const handleLocationChangeRequest = (slotId: string, newLoc: string) => {
+    setLocationPrompt({ slotId, newLoc });
+  };
+
+  const applyLocationChange = (applyToContinuous: boolean) => {
+    if (!locationPrompt) return;
+    const { slotId, newLoc } = locationPrompt;
+    
+    setDraftLocations(prev => {
+      const next = { ...prev };
+      if (!applyToContinuous) {
+        next[slotId] = newLoc;
+      } else {
+        const [day, timeStr] = slotId.split('-');
+        const baseTime = timeToFloat(timeStr);
+        
+        next[slotId] = newLoc;
+        
+        let t = baseTime - 0.5;
+        while (draftSlots.has(`${day}-${floatToTime(t)}`)) {
+          next[`${day}-${floatToTime(t)}`] = newLoc;
+          t -= 0.5;
+        }
+        
+        t = baseTime + 0.5;
+        while (draftSlots.has(`${day}-${floatToTime(t)}`)) {
+          next[`${day}-${floatToTime(t)}`] = newLoc;
+          t += 0.5;
+        }
+      }
+      return next;
+    });
+    setLocationPrompt(null);
+  };
 
   const handleSave = () => {
     const newShifts: any[] = Array.from(draftSlots).map(slot => {
@@ -453,7 +506,8 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
         subjects: tutor.subjects,
         day: day,
         startTime,
-        endTime
+        endTime,
+        location: draftLocations[slot] || 'SSC 600'
       };
     });
     onSave(newShifts);
@@ -463,7 +517,7 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+      <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0 }}>Edit {tutor.name}'s Schedule</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>&times;</button>
@@ -509,12 +563,31 @@ function TutorScheduleEditorModal({ tutor, currentSchedule, onSave, onClose }: a
           onChange={setDraftSlots} 
           endHour={activeEndHour} 
           days={activeDays}
+          locationsList={locationsList}
+          slotLocations={draftLocations}
+          onLocationChangeRequest={handleLocationChangeRequest}
         />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
           <button onClick={handleSave} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>
           <button onClick={onClose} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '1rem', cursor: 'pointer' }}>Cancel</button>
         </div>
+
+        {locationPrompt && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a' }}>Update Location</h3>
+              <p style={{ color: '#475569', marginBottom: '1.5rem' }}>
+                You selected <strong>{locationPrompt.newLoc}</strong>. Would you like to apply this to the entire continuous shift block, or just this 30-minute segment?
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <button onClick={() => applyLocationChange(true)} style={{ padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Apply to Entire Shift</button>
+                <button onClick={() => applyLocationChange(false)} style={{ padding: '0.75rem', backgroundColor: '#e2e8f0', color: '#1e293b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Just this 30-min Block</button>
+                <button onClick={() => setLocationPrompt(null)} style={{ padding: '0.75rem', backgroundColor: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', marginTop: '0.5rem' }}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -525,13 +598,12 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
   const currentPath = location.pathname;
   const navigate = useNavigate();
 
-  // --- NEW: Custom Discard Modal State ---
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const handleNavClick = (e: React.MouseEvent, targetPath: string) => {
     if (hasUnsavedChanges && currentPath !== targetPath) {
       e.preventDefault(); 
-      setPendingAction(targetPath); // Open modal instead of navigating
+      setPendingAction(targetPath); 
     }
   };
 
@@ -555,16 +627,19 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
         {isAdmin && (
           <>
             <Link onClick={(e) => handleNavClick(e, '/generate')} to="/generate" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/generate' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-              Schedule Generator
+              Generate
             </Link>
             <Link onClick={(e) => handleNavClick(e, '/admin')} to="/admin" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/admin' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-              Roster Dashboard
+              Roster
             </Link>
             <Link onClick={(e) => handleNavClick(e, '/courses')} to="/courses" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/courses' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-              Course Catalog
+              Courses
+            </Link>
+            <Link onClick={(e) => handleNavClick(e, '/locations')} to="/locations" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/locations' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+              Locations
             </Link>
             <Link onClick={(e) => handleNavClick(e, '/saved')} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
-              Saved Schedules
+              Saved
             </Link>
             
             <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -574,7 +649,6 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
         )}
       </nav>
 
-      {/* --- NEW: Custom Discard Confirmation Modal --- */}
       {pendingAction && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', maxWidth: '450px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
@@ -634,7 +708,7 @@ function App() {
       localStorage.setItem('peerConnectionsAdmin', 'true');
       navigate('/admin'); 
     } else {
-      showErrorToast('Incorrect PIN.'); // Using custom toast instead of alert
+      showErrorToast('Incorrect PIN.'); 
     }
   };
 
@@ -659,7 +733,6 @@ function App() {
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [selectedSubjectModal, setSelectedSubjectModal] = useState<string | null>(null);
   
-  // --- NEW App-Level Modals ---
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [saveNameInput, setSaveNameInput] = useState('');
   const [tutorToRemove, setTutorToRemove] = useState<{id: string, name: string} | null>(null);
@@ -707,7 +780,6 @@ function App() {
     setExpandedDepartments(new Set());
   };
 
-   // --- LOCAL STORAGE BACKUP HOOKS ---
   useEffect(() => {
     if (activeRoster.length > 0) {
       localStorage.setItem('activeRoster', JSON.stringify(activeRoster));
@@ -803,7 +875,6 @@ function App() {
     setSelectedTutorModal(null); 
   };
 
-  // --- NEW: Save As New Modal Logic ---
   const handleSaveClick = () => {
     if (schedule.length === 0) {
       showErrorToast("There is no schedule to save! Generate one first.");
@@ -851,7 +922,7 @@ function App() {
         if (shiftsForThisDay.length > 0) {
           text += `${day}:\n`;
           shiftsForThisDay.forEach((block: any) => {
-            text += `${format12Hour(block.startTime)} - ${format12Hour(block.endTime)}\n`;
+            text += `${format12Hour(block.startTime)} - ${format12Hour(block.endTime)} (${block.location || 'SSC 600'})\n`;
           });
           text += '\n';
         }
@@ -865,7 +936,7 @@ function App() {
     try {
       document.execCommand('copy');
       setCopiedTutorId(tutor.id);
-      showToast('Schedule copied to clipboard!'); // Polish: Add toast confirming copy
+      showToast('Schedule copied to clipboard!'); 
       setTimeout(() => setCopiedTutorId(null), 2000); 
     } catch (err) {
       console.error('Failed to copy schedule', err);
@@ -874,7 +945,6 @@ function App() {
     document.body.removeChild(textArea);
   };
 
-  // --- NEW: Remove Tutor Modal Logic ---
   const handleRemoveTutorClick = (tutorId: string, tutorName: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
     setTutorToRemove({ id: tutorId, name: tutorName });
@@ -936,7 +1006,6 @@ function App() {
     let sName: string | undefined | null = activeScheduleMeta?.name;
 
     if (!sName) {
-      // Replaced ugly prompt chain with simple error toast
       showErrorToast("Please click 'Save to Database' to name and save this schedule before exporting.");
       return; 
     }
@@ -961,6 +1030,7 @@ function App() {
         'End Time': format12Hour(shift.endTime),
         'Educator Name': tutor ? tutor.name : 'Unknown',
         Role: tutor && (tutor as any).role ? (tutor as any).role : 'Tutor',
+        Location: shift.location || 'SSC 600',
         Subjects: shift.subjects.join(" | ")
       };
     });
@@ -968,9 +1038,9 @@ function App() {
 
   const handleExportCSV = (safeName: string) => {
     const data = getExportData();
-    let csvContent = "Day,Start Time,End Time,Educator Name,Role,Subjects\n";
+    let csvContent = "Day,Start Time,End Time,Educator Name,Role,Location,Subjects\n";
     data.forEach(row => {
-      csvContent += `"${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}","${row.Subjects}"\n`;
+      csvContent += `"${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}","${row.Location}","${row.Subjects}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -994,9 +1064,9 @@ function App() {
     const data = getExportData();
     const doc = new jsPDF();
     doc.text(`${rawName} - Master Schedule`, 14, 15);
-    const tableData = data.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role, row.Subjects]);
+    const tableData = data.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role, row.Location, row.Subjects]);
     autoTable(doc, {
-      head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role', 'Subjects']],
+      head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role', 'Location', 'Subjects']],
       body: tableData,
       startY: 20,
       styles: { fontSize: 8 },
@@ -1026,6 +1096,7 @@ function App() {
           'End Time': end,
           'Educator Name': tutorName,
           Role: role,
+          Location: shift.location || 'SSC 600',
           _rawStart: shift.startTime 
         });
       });
@@ -1040,9 +1111,9 @@ function App() {
 
   const handleExportSubjectCSV = (safeName: string) => {
     const data = getSubjectExportData();
-    let csvContent = "Subject,Day,Start Time,End Time,Educator Name,Role\n";
+    let csvContent = "Subject,Day,Start Time,End Time,Educator Name,Role,Location\n";
     data.forEach(row => {
-      csvContent += `"${row.Subject}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}"\n`;
+      csvContent += `"${row.Subject}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Educator Name']}","${row.Role}","${row.Location}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1071,11 +1142,11 @@ function App() {
     let currentY = 25;
     uniqueSubjects.forEach(subject => {
       const subjectData = data.filter(item => item.Subject === subject);
-      const tableData = subjectData.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role]);
+      const tableData = subjectData.map(row => [row.Day, row['Start Time'], row['End Time'], row['Educator Name'], row.Role, row.Location]);
       doc.setFontSize(12);
       doc.text("Subject: " + subject, 14, currentY);
       autoTable(doc, {
-        head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role']],
+        head: [['Day', 'Start Time', 'End Time', 'Educator Name', 'Role', 'Location']],
         body: tableData,
         startY: currentY + 4,
         styles: { fontSize: 8 },
@@ -1127,6 +1198,7 @@ const getEducatorTimesheetData = () => {
         'Start Time': format12Hour(shift.startTime),
         'End Time': format12Hour(shift.endTime),
         'Shift Duration (Hrs)': duration.toFixed(2),
+        Location: shift.location || 'SSC 600',
         'Subjects Covered': subjectsStr
       });
     });
@@ -1137,9 +1209,9 @@ const getEducatorTimesheetData = () => {
 
 const handleExportEducatorCSV = (safeName: string) => {
     const data = getEducatorTimesheetData();
-    let csvContent = "Educator Name,Role,Day,Start Time,End Time,Shift Duration (Hrs),Subjects Covered\n";
+    let csvContent = "Educator Name,Role,Day,Start Time,End Time,Shift Duration (Hrs),Location,Subjects Covered\n";
     data.forEach(row => {
-      csvContent += `"${row['Educator Name']}","${row.Role}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Shift Duration (Hrs)']}","${row['Subjects Covered']}"\n`;
+      csvContent += `"${row['Educator Name']}","${row.Role}","${row.Day}","${row['Start Time']}","${row['End Time']}","${row['Shift Duration (Hrs)']}","${row.Location}","${row['Subjects Covered']}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1153,7 +1225,7 @@ const handleExportEducatorCSV = (safeName: string) => {
   const handleExportEducatorExcel = (safeName: string) => {
     const data = getEducatorTimesheetData();
     const worksheet = XLSX.utils.json_to_sheet(data, {
-      header: ["Educator Name", "Role", "Day", "Start Time", "End Time", "Shift Duration (Hrs)", "Subjects Covered"]
+      header: ["Educator Name", "Role", "Day", "Start Time", "End Time", "Shift Duration (Hrs)", "Location", "Subjects Covered"]
     });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Educator Timesheets");
@@ -1213,7 +1285,7 @@ const handleExportEducatorCSV = (safeName: string) => {
             dayShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
             dayShifts.forEach(shift => {
               if (currentY > 275) { doc.addPage(); currentY = 20; }
-              doc.text(`${format12Hour(shift.startTime)} - ${format12Hour(shift.endTime)}`, 18, currentY);
+              doc.text(`${format12Hour(shift.startTime)} - ${format12Hour(shift.endTime)} (${shift.location || 'SSC 600'})`, 18, currentY);
               currentY += 5;
             });
             currentY += 2; 
@@ -1235,18 +1307,15 @@ const handleExportEducatorCSV = (safeName: string) => {
 
   return (
   <div style={{ fontFamily: 'sans-serif', width: '100%', boxSizing: 'border-box' }}>
-      {/* --- NEW: Modern Toast Notification UI --- */}
     {toastMessage && (
     <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', backgroundColor: toastType === 'error' ? '#ef4444' : '#10b981', color: 'white', padding: '1rem 1.5rem', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 1000, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
       {toastType === 'error' ? (
-        /* Error Alert SVG */
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="12" y1="8" x2="12" y2="12"></line>
           <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
       ) : (
-        /* Checkmark SVG */
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
           <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -1277,11 +1346,18 @@ const handleExportEducatorCSV = (safeName: string) => {
             </div>
           } />
 
-
-          {/* --- NEW: Course Catalog Route --- */}
           <Route path="/courses" element={
             <ProtectedRoute isAdmin={isAdmin}>
               <AdminCoursesPage 
+                showToast={showToast}
+                showErrorToast={showErrorToast}
+              />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/locations" element={
+            <ProtectedRoute isAdmin={isAdmin}>
+              <AdminLocationsPage 
                 showToast={showToast}
                 showErrorToast={showErrorToast}
               />
@@ -1374,7 +1450,6 @@ const handleExportEducatorCSV = (safeName: string) => {
                       </button>
                     )}
 
-                    {/* --- NEW EXPORT MENU --- */}
                     <div style={{ position: 'relative' }}>
                     <button 
                       onClick={() => setShowExportModal(!showExportModal)} 
@@ -1415,10 +1490,7 @@ const handleExportEducatorCSV = (safeName: string) => {
                         overflow: 'hidden', 
                         minWidth: '200px' 
                       }}>
-                        
-                        
   
-                        {/* SECTION: MASTER SCHEDULE */}
                         <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
                           Master Schedule
                         </div>
@@ -1449,7 +1521,6 @@ const handleExportEducatorCSV = (safeName: string) => {
 
                         <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
                         
-                        {/* SECTION: EDUCATOR BREAKDOWNS */}
                         <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
                           Educator Breakdowns
                         </div>
@@ -1480,7 +1551,6 @@ const handleExportEducatorCSV = (safeName: string) => {
   
                         <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
                         
-                        {/* SECTION: SUBJECT COVERAGE */}
                         <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#f8fafc' }}>
                           Subject Coverage
                         </div>
@@ -1508,8 +1578,6 @@ const handleExportEducatorCSV = (safeName: string) => {
                         >
                           📕 PDF Document
                         </button>
-
-                      <div style={{ borderTop: '1px solid #e2e8f0' }}></div>
 
                       </div>
                     )}
@@ -1546,12 +1614,9 @@ const handleExportEducatorCSV = (safeName: string) => {
 
                 {isTutorsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
-                  {/* --- Expanded Filter Controls --- */}
                   <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     
-                    {/* Modern Search Input Wrapper */}
                     <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
-                      {/* SVG Search Icon */}
                       <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -1588,7 +1653,6 @@ const handleExportEducatorCSV = (safeName: string) => {
                         Available at Night
                       </label>
 
-                      {/* --- Weekend Availability Checkbox --- */}
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input
                           type="checkbox"
@@ -1600,17 +1664,14 @@ const handleExportEducatorCSV = (safeName: string) => {
                       </label>
                     </div>
 
-                    {/* --- NEW: Grouped and Sorted Tutor Display --- */}
                     {filteredTutors.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                         {['Tutor', 'Mentor', 'SI Leader'].map(roleGroup => {
-                          // Filter the educators that match the current role in the loop
                           const tutorsInRole = filteredTutors.filter(t => {
                             const tutorRole = (t as any).role || 'Tutor';
                             return tutorRole === roleGroup;
                           });
 
-                          // If there are no educators in this role matching the search, skip rendering this section
                           if (tutorsInRole.length === 0) return null;
 
                           return (
@@ -1720,7 +1781,6 @@ const handleExportEducatorCSV = (safeName: string) => {
                                           <p style={{ color: 'gray', fontStyle: 'italic', margin: 0 }}>Not scheduled this week.</p>
                                         ) : (
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', color: '#475569' }}>
-                                            {/* Explicitly list all 7 days to account for potential weekend shifts */}
                                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                                               const shiftsForThisDay = mergeShiftsForUI(tutorShifts).filter(s => s.day === day);
                                               if (shiftsForThisDay.length === 0) return null;
@@ -1729,7 +1789,7 @@ const handleExportEducatorCSV = (safeName: string) => {
                                                   <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.15rem' }}>{day}</strong>
                                                   {shiftsForThisDay.map((block: any, index: number) => (
                                                     <div key={index} style={{ fontSize: '0.95rem', marginBottom: '0.15rem' }}>
-                                                      {format12Hour(block.startTime)} - {format12Hour(block.endTime)}
+                                                      {format12Hour(block.startTime)} - {format12Hour(block.endTime)} <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>({block.location || 'SSC 600'})</span>
                                                     </div>
                                                   ))}
                                                 </div>
@@ -1782,7 +1842,6 @@ const handleExportEducatorCSV = (safeName: string) => {
                 {isSubjectsOpen && (
                   <div style={{ paddingBottom: '1rem' }}>
                   <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
-                    {/* SVG Search Icon */}
                     <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '1.2rem', height: '1.2rem', color: '#94a3b8' }}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -1889,8 +1948,6 @@ const handleExportEducatorCSV = (safeName: string) => {
 
         </Routes>
       </div>
-
-      {/* --- NEW App-Level Modals --- */}
 
       {/* 1. Save As New Modal */}
       {isSaveModalOpen && (

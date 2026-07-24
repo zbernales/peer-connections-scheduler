@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import type { Shift, DayOfWeek, Tutor } from '../types';
 import { timeToFloat, floatToTime, format12Hour } from '../utils/scheduler';
 
-// --- NEW: Added endHour to props ---
 interface SubjectScheduleGridProps {
   subject: string;
   shifts: Shift[];
@@ -12,10 +11,10 @@ interface SubjectScheduleGridProps {
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectScheduleGridProps) {
+export function SubjectScheduleGrid({ subject, shifts, roster, endHour = 17 }: SubjectScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
-  // --- NEW: Dynamically generate the times array based on the endHour prop ---
   const times = useMemo(() => {
     const generatedTimes: string[] = [];
     for (let i = 9; i < endHour; i += 0.5) {
@@ -29,6 +28,7 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
   shifts.forEach(shift => {
     const tutor = roster.find(t => t.id === shift.tutorId);
     const tutorName = tutor ? tutor.name : 'Unknown';
+    const loc = shift.location || 'SSC 600'; // <-- Fallback to SSC 600 if missing
 
     let current = timeToFloat(shift.startTime);
     const end = timeToFloat(shift.endTime);
@@ -39,25 +39,98 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
       if (!coverageMap.has(cellId)) {
         coverageMap.set(cellId, []);
       }
-      coverageMap.get(cellId)!.push(tutorName);
+      
+      // Pushing the name + location into the hover tooltip array
+      coverageMap.get(cellId)!.push(`${tutorName} (${loc})`);
       
       current += 0.5;
     }
   });
 
+  const handleCopyGrid = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    let text = `${subject} Coverage Schedule\n\n`;
+
+    if (shifts.length === 0) {
+      text += "No coverage scheduled this week.\n";
+    } else {
+      const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      
+      ALL_DAYS.forEach(day => {
+        const dayShifts = shifts.filter(s => s.day === day);
+        if (dayShifts.length > 0) {
+          text += `${day}:\n`;
+          // Sort sequentially by start time
+          dayShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+          
+          dayShifts.forEach(shift => {
+            const tutor = roster.find(t => t.id === shift.tutorId);
+            const tutorName = tutor ? tutor.name : 'Unknown Educator';
+            const role = tutor && (tutor as any).role ? (tutor as any).role : 'Tutor';
+            const loc = shift.location || 'SSC 600'; // <-- Include location in copy text
+            
+            text += `- ${format12Hour(shift.startTime)} to ${format12Hour(shift.endTime)} (${tutorName}, ${role} @ ${loc})\n`;
+          });
+          text += '\n';
+        }
+      });
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text.trim();
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy grid schedule', err);
+    }
+    document.body.removeChild(textArea);
+  };
+
   return (
     <div style={{ overflowX: 'auto', paddingBottom: '1rem', paddingTop: '1rem' }}>
       
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '16px', height: '16px', backgroundColor: '#10b981', borderRadius: '4px' }}></div>
-          <span>Covered</span>
+      {/* Header Controls: Legend + Copy Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', backgroundColor: '#10b981', borderRadius: '4px' }}></div>
+            <span>Covered</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px' }}></div>
+            <span>No Coverage</span>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '16px', height: '16px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px' }}></div>
-          <span>No Coverage</span>
-        </div>
+
+        {/* Copy Button */}
+        <button 
+          onClick={handleCopyGrid}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.5rem 1rem',
+            backgroundColor: isCopied ? '#ecfdf5' : 'white',
+            color: isCopied ? '#10b981' : '#475569',
+            border: `1px solid ${isCopied ? '#10b981' : '#cbd5e1'}`,
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+          }}
+          title={`Copy ${subject} Schedule`}
+        >
+          {isCopied ? '✅ Copied to Clipboard!' : '📋 Copy Schedule Text'}
+        </button>
+
       </div>
 
       {/* The Grid */}
@@ -71,7 +144,6 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
           </div>
         ))}
 
-        {/* --- UPDATED: Using the dynamic times array --- */}
         {times.map(time => {
           // Identify the 5:00 PM boundary
           const isNightStart = time === '17:00';
@@ -79,14 +151,13 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
           return (
             <div style={{ display: 'contents' }} key={time}>
               
-              {/* --- NEW: The Solid Spanning Divider --- */}
               {isNightStart && (
                 <div style={{
                   gridColumn: '1 / -1', 
                   height: '3px',
                   backgroundColor: '#334155',
                   marginTop: '0.75rem',
-                  marginBottom: '0.75rem', // Extra gap underneath!
+                  marginBottom: '0.75rem', 
                   borderRadius: '2px'
                 }} />
               )}
@@ -120,7 +191,7 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
                     style={{
                       height: '24px',
                       backgroundColor: isCovered ? '#10b981' : '#f1f5f9', 
-                      border: '1px solid #cbd5e1', // Reverted to uniform borders
+                      border: '1px solid #cbd5e1', 
                       borderRadius: '2px',
                       position: 'relative', 
                       cursor: isCovered ? 'pointer' : 'default'
@@ -134,7 +205,7 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
                         transform: 'translateX(-50%)', 
                         backgroundColor: '#1e293b', 
                         color: 'white', 
-                        padding: '4px 8px', 
+                        padding: '6px 10px', // Extra padding for larger tooltip
                         borderRadius: '4px', 
                         fontSize: '0.75rem', 
                         whiteSpace: 'nowrap',
@@ -142,7 +213,12 @@ export function SubjectScheduleGrid({ shifts, roster, endHour = 17 }: SubjectSch
                         pointerEvents: 'none', 
                         boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
                       }}>
-                        {tutorsHere.join(', ')}
+                        {/* Map over the list so multiple tutors don't smash together onto one line */}
+                        {tutorsHere.map((t, idx) => (
+                           <div key={idx} style={{ paddingBottom: idx === tutorsHere.length - 1 ? 0 : '4px' }}>
+                             {t}
+                           </div>
+                        ))}
                       </div>
                     )}
                   </div>

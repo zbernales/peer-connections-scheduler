@@ -10,6 +10,7 @@ import { TutorScheduleGrid } from './components/TutorScheduleGrid';
 import { SubjectScheduleGrid } from './components/SubjectScheduleGrid';
 import { AdminCoursesPage } from './components/AdminCoursesPage';
 import { ScheduleGenerationPage } from './components/ScheduleGenerationPage';
+import { AdminLocationsPage } from './components/AdminLocationsPage'; // <-- NEW IMPORT
 import type { Tutor, DayOfWeek, ScheduleConfig, Shift } from './types';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -563,10 +564,15 @@ function NavBar({ hasUnsavedChanges, onDiscardChanges, isAdmin, onLogout }: { ha
             <Link onClick={(e) => handleNavClick(e, '/courses')} to="/courses" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/courses' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
               Course Catalog
             </Link>
+            {/* --- NEW: Locations Link --- */}
+            <Link onClick={(e) => handleNavClick(e, '/locations')} to="/locations" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/locations' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
+              Locations
+            </Link>
             <Link onClick={(e) => handleNavClick(e, '/saved')} to="/saved" style={{ textDecoration: 'none', padding: '0.5rem 1rem', backgroundColor: currentPath === '/saved' ? '#3b82f6' : 'transparent', color: 'white', border: '1px solid #3b82f6', borderRadius: '4px' }}>
               Saved Schedules
             </Link>
             
+            {/* --- RESTORED: Log Out Button --- */}
             <button onClick={onLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
               Log Out
             </button>
@@ -936,7 +942,6 @@ function App() {
     let sName: string | undefined | null = activeScheduleMeta?.name;
 
     if (!sName) {
-      // Replaced ugly prompt chain with simple error toast
       showErrorToast("Please click 'Save to Database' to name and save this schedule before exporting.");
       return; 
     }
@@ -1282,6 +1287,15 @@ const handleExportEducatorCSV = (safeName: string) => {
           <Route path="/courses" element={
             <ProtectedRoute isAdmin={isAdmin}>
               <AdminCoursesPage 
+                showToast={showToast}
+                showErrorToast={showErrorToast}
+              />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/locations" element={
+            <ProtectedRoute isAdmin={isAdmin}>
+              <AdminLocationsPage 
                 showToast={showToast}
                 showErrorToast={showErrorToast}
               />

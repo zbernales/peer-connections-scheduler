@@ -109,38 +109,42 @@ export function TutorScheduleGrid({
         onMouseEnter={() => handleMouseEnter(cellId)}
         title="Click and drag to toggle shift"
         style={{
-          height: '28px', // Slightly taller to fit the select dropdown
+          height: '28px',
           backgroundColor: bgColor,
           border: '1px solid #cbd5e1',
           borderRadius: '2px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'flex-end', // <-- Push dropdown to right
           position: 'relative'
         }}
       >
+        {/* We place the select box here on the right, leaving the left side easy to click/drag */}
         {isScheduled && locationsList.length > 0 && onLocationChangeRequest && (
           <select
             value={currentLoc}
             onMouseDown={(e) => e.stopPropagation()} // Prevents dragging when clicking dropdown
             onChange={(e) => onLocationChangeRequest(cellId, e.target.value)}
             style={{
-              width: '90%',
+              width: '65%', // <-- Narrower dropdown
               height: '80%',
+              marginRight: '2px',
               fontSize: '0.65rem',
-              backgroundColor: 'rgba(255,255,255,0.2)',
+              backgroundColor: 'rgba(255,255,255,0.25)',
               color: 'white',
               border: 'none',
               outline: 'none',
               cursor: 'pointer',
               fontWeight: 'bold',
               borderRadius: '2px',
-              textAlign: 'center'
+              textAlign: 'center',
+              textOverflow: 'ellipsis'
             }}
           >
             <option value="SSC 600" style={{ color: 'black' }}>SSC 600</option>
-            {locationsList.map(l => (
+            {/* Filter out SSC 600 if it was manually added by user in settings */}
+            {locationsList.filter(l => l.name !== 'SSC 600').map(l => (
               <option key={l.id} value={l.name} style={{ color: 'black' }}>{l.name}</option>
             ))}
           </select>

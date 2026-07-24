@@ -8,7 +8,6 @@ interface TutorScheduleGridProps {
   onChange: (newSlots: Set<string>) => void; 
   endHour?: number;
   days: string[];
-  // --- NEW PROPS FOR LOCATIONS ---
   locationsList?: Location[];
   slotLocations?: Record<string, string>;
   onLocationChangeRequest?: (slotId: string, newLoc: string) => void;
@@ -114,40 +113,69 @@ export function TutorScheduleGrid({
           border: '1px solid #cbd5e1',
           borderRadius: '2px',
           cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end', // <-- Push dropdown to right
-          position: 'relative'
+          position: 'relative',
+          overflow: 'hidden' // Keeps the inner elements constrained
         }}
       >
-        {/* We place the select box here on the right, leaving the left side easy to click/drag */}
         {isScheduled && locationsList.length > 0 && onLocationChangeRequest && (
-          <select
-            value={currentLoc}
-            onMouseDown={(e) => e.stopPropagation()} // Prevents dragging when clicking dropdown
-            onChange={(e) => onLocationChangeRequest(cellId, e.target.value)}
-            style={{
-              width: '65%', // <-- Narrower dropdown
-              height: '80%',
-              marginRight: '2px',
-              fontSize: '0.65rem',
-              backgroundColor: 'rgba(255,255,255,0.25)',
+          <>
+            {/* Centered Location Text */}
+            <span style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
               color: 'white',
-              border: 'none',
-              outline: 'none',
-              cursor: 'pointer',
+              fontSize: '0.65rem',
               fontWeight: 'bold',
-              borderRadius: '2px',
-              textAlign: 'center',
-              textOverflow: 'ellipsis'
-            }}
-          >
-            <option value="SSC 600" style={{ color: 'black' }}>SSC 600</option>
-            {/* Filter out SSC 600 if it was manually added by user in settings */}
-            {locationsList.filter(l => l.name !== 'SSC 600').map(l => (
-              <option key={l.id} value={l.name} style={{ color: 'black' }}>{l.name}</option>
-            ))}
-          </select>
+              pointerEvents: 'none', // Lets clicks pass through to drag functionality
+              whiteSpace: 'nowrap'
+            }}>
+              {currentLoc}
+            </span>
+
+            {/* Right-aligned Dropdown Arrow Container */}
+            <div 
+              onMouseDown={(e) => e.stopPropagation()} // Stop dragging when interacting with dropdown
+              style={{
+                position: 'absolute',
+                right: '0',
+                top: '0',
+                bottom: '0',
+                width: '20px',
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderLeft: '1px solid rgba(255,255,255,0.3)',
+                cursor: 'pointer'
+            }}>
+              {/* Visual Arrow */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ width: '12px', height: '12px', color: 'white', pointerEvents: 'none' }}>
+                <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+              </svg>
+
+              {/* Invisible Select laid exactly over the arrow container */}
+              <select
+                value={currentLoc}
+                onChange={(e) => onLocationChangeRequest(cellId, e.target.value)}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  opacity: 0, // Make it invisible
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="SSC 600" style={{ color: 'black' }}>SSC 600</option>
+                {locationsList.filter(l => l.name !== 'SSC 600').map(l => (
+                  <option key={l.id} value={l.name} style={{ color: 'black' }}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
       </div>
     );
@@ -249,7 +277,7 @@ export function TutorScheduleGrid({
         })}
       </div>
       <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', marginTop: '1rem' }}>
-        * Click and drag to quickly paint or erase shifts for this tutor. Use dropdowns inside blocks to change location.
+        * Click and drag to quickly paint or erase shifts for this tutor. Use the arrow icon on blocks to change location.
       </p>
     </div>
   );
